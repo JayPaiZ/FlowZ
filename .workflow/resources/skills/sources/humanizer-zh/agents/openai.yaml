@@ -1,0 +1,4 @@
+interface:
+  display_name: "中文 Humanizer"
+  short_description: "自然改写中文，同时保留事实与原意"
+  default_prompt: "使用 $humanizer-zh 自然改写这段中文，不改变其中的事实。"

@@ -4,7 +4,13 @@
 
 Use this workflow to help developers use existing AI coding agent capabilities in a predictable way. The first adapter targets Cline, but the principles are not limited to VS Code, Cline, or one host. This is a lightweight guidance layer, not a new agent runtime or hard security boundary.
 
-The first version is Cline-first. It may reference project rules, project operation guides, skills, hooks, and host tools when they are available, but the core workflow must still work without any optional capability.
+The first version is Cline-first. It may reference project rules, project operation guides, skills, hooks, and host tools when they are available, but the core workflow must still work without any optional capability. The FlowZ repository is an installation source, not a directory to copy into every project. Bundled Skill source assets live under `.workflow/resources/skills/`; they are not project-runtime Skills. During Cline onboarding or when a required bundled Skill is missing, the Agent runs the unified installer to place selected assets in the user's Cline directories; no per-Skill confirmation is required. The core workflow still does not download or install Skills during every task.
+
+## Global installation and first-task onboarding
+
+When the user asks to install FlowZ, or when onboarding detects that the bundled Cline capabilities are missing, the Agent runs `.workflow/resources/skills/install-flowz-cline.ps1` from this distribution source. The installer installs the global rule and the manifest's Cline defaults once, using hash verification and a no-overwrite conflict policy. It does not copy FlowZ into project directories and does not modify Cline's native or global Skills.
+
+After installation, the global rule is applied when the Agent handles the first task in each newly created or loaded workspace. At that point the Agent reads the workspace's existing `AGENTS.md`, `.clinerules/`, `.workflow/`, relevant code, docs, tests, and runtime evidence, then preserves and reuses them. It creates project task state only when a Standard or Full task needs persistence. Opening a folder alone is not a verified trigger; if the host does not load the user rule on the first task, use the specified fallback instruction `安装 FlowZ Cline 全局工作流，并在当前工作区启用它` to rerun the installer. The Agent should not ask the user to select Skills or copy project files.
 
 ## Operating principles
 
@@ -19,6 +25,146 @@ The first version is Cline-first. It may reference project rules, project operat
 ## Task triage
 
 Choose the smallest tier that fits. These tiers describe the depth of the working loop, not a file-count checklist. Use judgment, and escalate when ambiguity, risk, or scope grows.
+
+## Lifecycle and routing model
+
+Use `Quick`, `Standard`, and `Full` as the only task-depth vocabulary. The lifecycle below defines the available stages and their handoff contracts; it is not a mandatory pipeline for every task.
+
+```text
+Intake / Triage
+    -> Quick / Standard / Full
+    -> Problem Exploration
+    -> Solution Design
+    -> Design Challenge
+    -> Revise Design
+    -> Human Approval
+    -> Writing Plan
+    -> Implementation
+    -> Verification / Review
+```
+
+Enter only the stages whose exit conditions are not already satisfied. At most one capability may lead a stage. Skills must not call one another or automatically start the next stage. When a stage ends, emit its structured handoff, then route again from the current evidence.
+
+Recommended stage capabilities:
+
+| Stage | Default capability | Enter when |
+| --- | --- | --- |
+| Problem Exploration | `office-hours` | The problem, user, goal, current state, or evidence is unclear. |
+| Solution Design | Host-preplanned design route: on Cline use native `/deep-planning`; other hosts must use their own equivalent native design capability or apply the structured design contract manually. | The goal is understood but there is no implementable design. |
+| Design Challenge | `grill-me` / `grilling` | An existing design or assumption needs counterexamples, vulnerability checks, hidden-assumption review, or evidence-gap analysis. |
+| Writing Plan | Host-specific planning capability | The design is approved and must be decomposed into executable steps. |
+| Implementation | Cline Act or host equivalent | The required design and approval gates are complete. |
+| Verification / Review | Project checks, tests, and review | Implementation is complete or a result needs independent validation. |
+
+Stage handoff contracts:
+
+| Handoff | Required output |
+| --- | --- |
+| Problem Exploration | `Problem`, `User`, `Goal`, `Non-goals`, `Evidence` |
+| Solution Design | `Options`, `Recommendation`, `Architecture`, `Data Flow`, `Risks` |
+| Design Challenge | `Findings`, `Hidden Assumptions`, `Missing States`, `Required Revisions` |
+| Human Approval input | `Approved Design`, `Scope`, `Acceptance Criteria` |
+| Writing Plan | Ordered steps, affected files or boundaries, verification commands, and rollback or recovery notes when relevant |
+
+Tier paths are defaults, not rigid checklists:
+
+```text
+Quick:    lightweight design -> lightweight confirmation when needed -> Implement -> Verify
+Standard: Solution Design -> optional Design Challenge -> Approval when a material boundary changes
+          -> Writing Plan -> Implement -> Verify
+Full:     Problem Exploration -> Solution Design -> Design Challenge -> Revise Design
+          -> Approval -> Writing Plan -> Implement -> Review -> Verify
+```
+
+If the user enters with a concrete proposal, use the exception route `Design Challenge -> Solution Design revision -> Approval`; skip the challenge when the proposal is already clear, low-risk, and has no material unresolved boundary.
+
+Approval scales with risk. Quick work may proceed after a lightweight confirmation or directly when the intent and scope are clear; Standard and Full work must wait when the decision changes behavior, architecture, data, permissions, external state, or another material boundary.
+
+## Token-efficient execution and quality guardrails
+
+The objective is to reduce redundant context and output while preserving task
+completion quality. Do not impose an arbitrary per-task token ceiling until
+real usage evidence supports one.
+
+### Compact task packet
+
+For Standard and Full work, maintain a compact task packet at stage boundaries:
+
+```text
+Goal
+Scope and non-goals
+Constraints
+Relevant files and evidence
+Confirmed decisions
+Open questions
+Acceptance criteria
+Verification and next step
+```
+
+Pass this packet to the next stage instead of replaying the full conversation.
+Do not compress away goals, constraints, decisions, risks, acceptance criteria,
+or verification state. Quick work should remain session-only unless the project
+already requires persistent state.
+
+### Efficiency rules
+
+1. Choose the smallest applicable task tier. A clear, low-risk task should not
+   enter exploratory, challenge, or formal design stages merely because they
+   are available.
+2. Read only relevant instructions, files, tests, and runtime evidence. Expand
+   the read scope only when new evidence requires it.
+3. Keep stage outputs concise and non-repetitive. Expand them when the user
+   requests detail or when a material risk requires it.
+4. After a failure, pass only the new evidence, failure point, eliminated
+   causes, and changed next step. Never restart with the entire prior context.
+5. Do not automatically chain `office-hours`, `grilling`, and `/deep-planning`.
+   One stage lead is enough; route again only when the current evidence leaves
+   an unmet exit condition.
+
+### Quality fallback
+
+If the user reports an incomplete or incorrect result, an acceptance criterion
+is unmet, verification fails, or the task packet conflicts with new evidence,
+stop compressing and restore the detail needed to resolve the specific gap.
+Escalate from Quick to Standard or Full when the risk warrants it, and preserve
+the new evidence rather than restarting the whole task.
+
+### User-verifiable checks
+
+For low-risk, observable outcomes, prefer giving the user an exact command or
+operation path, the expected result, and what to report on failure. The Agent
+still performs checks that protect correctness, security, data integrity, or a
+critical regression. In ordinary development tasks, the Agent must not
+calculate, display, or request hashes; hash checks remain limited to installers
+or other explicitly integrity-sensitive tooling.
+
+### Measurement without premature limits
+
+When aggregate usage evidence becomes available, compare token use with task
+completion, retries, verification failures, and user-requested rework. Change
+one efficiency rule at a time and revert it if completion quality deteriorates.
+Do not claim a token reduction or a completion-rate improvement without
+measured evidence.
+
+### Optional external chat assistance
+
+The Agent may suggest a separate user-operated chat page when the current
+request can be completed from the user's text or one text attachment/text file
+without reading the project, running commands, modifying files, or checking
+runtime state. This is a lightweight suggestion, not a new workflow stage or
+Skill. Image analysis is not included in this version.
+
+Suggest it only when the input or discussion is large enough that moving the
+analysis out of the current task is likely to help. The user decides whether
+to use the page; the Agent supplies a short prompt and accepts either the
+returned result or a decision to continue locally. If the result is returned,
+use it as an unverified reference and do not repeat the same analysis through
+another Skill. Do not suggest the page for implementation, project-specific
+debugging, command execution, or verification work.
+
+Proactive suggestions are enabled by default. An explicit user request to
+enable or disable these suggestions takes precedence and remains in effect for
+the applicable conversation or workspace scope.
 
 ### Quick
 
@@ -71,7 +217,16 @@ This section tells Cline how to apply the host-neutral workflow. It is an execut
 - Map Full work to `/deep-planning` or an equivalent Cline planning pass that produces a reviewable design or specification before Act mode.
 - Collect relevant workspace context yourself: inspect the applicable instructions, code, documents, tests, and runtime evidence. If context is missing, ask the user in plain language; do not make them learn a file-mention syntax.
 - Treat `AGENTS.md` and `.clinerules/` as instruction sources. Use conditional rules when their file scope matches the current work.
+- Treat `.workflow/resources/skills/manifest.json` and its source directories as the package manifest and source of truth for bundled Skill assets. Do not load these files as project-runtime Skills from `.cline/skills/`.
+- During Cline onboarding or when a required bundled Skill is missing, the Agent automatically runs `install-flowz-cline.ps1`. It installs only manifest entries marked for Cline into `%USERPROFILE%\\.cline\\skills` and the global rule into `%USERPROFILE%\\.cline\\rules`; no per-install user confirmation is required. `%USERPROFILE%\\.agents\\skills` is retained only as a documented compatibility candidate and is never selected by the Cline-only installer. Preserve existing installations, verify hashes, report differing same-name conflicts without overwriting, and reload or refresh Cline after installation.
+- Use the bundled source first. If a listed source is missing, use the manifest's recorded public source only when retrieval is authorized and safe; if retrieval fails, report the gap instead of silently substituting another Skill.
 - Invoke an enabled Skill only when its trigger matches the task. If an applicable Skill is unavailable or incompatible, continue with the core workflow when possible and state the gap.
+- Prefer a project-bundled Skill over a same-purpose host-native Skill only when the project explicitly defines the project Skill as the authoritative adaptation. Otherwise preserve the native Skill behavior and document any compatibility difference; do not modify Cline's built-in or global Skills as part of a project task.
+- Cline's native `/deep-planning` is the Full-task engineering-design entry point. Do not automatically chain a second design Skill with it; choose one design lead for a phase.
+- Use Plan and Act as host controls: the Agent may recommend the appropriate mode, but project rules cannot reliably switch modes or approve actions on the user's behalf.
+- Use `@问题` or an equivalent Problems diagnostic context only as an input signal. Inspect the referenced files, reproduce or verify the issue, and do not treat the Problems view as the sole source of truth.
+- Treat Cline Workflows and Hooks as version-dependent unless the current host has been verified. Do not make them mandatory for the core workflow based on screenshots or unverified host behavior.
+- Apply the token-efficiency guardrails: use compact task packets, avoid repeated context, restore detail when quality signals deteriorate, prefer user-verifiable low-risk checks, and do not calculate hashes during ordinary development tasks.
 - Use `/smol` or `/compact` only as a context-management action when needed or requested. It does not replace the handoff contract.
 - After a handoff is recommended and the user confirms, generate the handoff prompt. The user decides whether to use Cline's `/newtask` or start another blank session.
 - A Checkpoint may be created before Act mode for Standard or Full work when it helps recovery. It does not replace verification or handoff.
@@ -83,7 +238,7 @@ Select capabilities after triage. Do not call or install something merely becaus
 | Capability | Use it when | Default behavior |
 | --- | --- | --- |
 | Project operation guide | The project has a stable operation documented in a README, runbook, script, or command. | Reuse the project source of truth; do not assume a universal operation-guide mechanism. |
-| Skill | The task needs reusable judgment, analysis, review, or a domain-specific method. | Use a relevant enabled skill when its trigger matches. |
+| Skill | The task needs reusable judgment, analysis, review, or a domain-specific method. | Use a relevant enabled Skill when its trigger matches. Project-bundled source assets are installed into the host's user-level Skill directory during Cline onboarding or when the required bundled Skill is missing. |
 | Hook | A check or action must happen at a lifecycle point and can be judged mechanically. | Keep it out of the core workflow until repeated evidence justifies automation. |
 
 Selection rules:
@@ -93,10 +248,17 @@ Selection rules:
 3. Use a Skill when judgment is the main part of the work. If the matching Skill is unavailable, use the requirements or review checklist manually.
 4. Use a Hook only for deterministic enforcement, not as a substitute for thinking or review.
 5. Do not assume a Skill, Rule, Workflow, or Hook from one agent can run on another agent without adaptation.
-6. Keep installation and host integration outside the core workflow. Ask before installing or enabling anything.
+6. Keep Skill installation and host integration outside the core task loop. During Cline onboarding or when a required bundled Skill is missing, automatically run `.workflow/resources/skills/install-flowz-cline.ps1`, which installs the global rule and selected manifest entries into the Cline user-level directories and verifies the result; do not place them in the project `.cline/skills/` directory by default.
 7. If no available capability materially improves the task, continue without one.
 
 Capability availability is distinct from task applicability: an enabled capability that does not match the task should remain unused, while a missing or incompatible capability is a reported gap rather than a reason to invent a substitute.
+
+Design-entry routing is host-planned, not user-selected:
+
+- Cline uses native `/deep-planning` for Solution Design and the Full-task design gate.
+- Other hosts must use their own equivalent native design capability or apply the structured design handoff manually; this project does not bundle a fallback design Skill.
+- A combined native-plus-second-design-Skill route is not enabled in the Cline adapter v0.1. A future adapter may define one only when it specifies a single stage lead, structured handoff fields, and no automatic mutual invocation.
+- The Agent decides the route from the detected host and task tier; ordinary users are not asked to choose between these design mechanisms.
 
 ## Scope and safety
 
