@@ -30,10 +30,18 @@ existing project record just to mark onboarding complete.
 The rule is triggered by the first task, not by opening a folder alone. If the
 host does not apply user rules automatically, the supported fallback is for the
 user to issue one instruction such as: `安装 FlowZ Cline 全局工作流，并在当前工作区启用它`.
-The Agent then runs the bundled `install-flowz-cline.ps1` from the open FlowZ
-distribution source. Do not ask for separate confirmation for each bundled
-Skill. Do not claim that project onboarding happened before a workspace task
-actually runs.
+Before installing, detect the host operating system and resolve the active
+Cline user's actual Skills and Rules directories. On Windows run
+`.workflow/resources/skills/install-flowz-cline.ps1`; on Ubuntu or another Linux
+host run `.workflow/resources/skills/install-flowz-cline.sh`. Pass the resolved
+directories explicitly with the installer's target arguments. The manifest's
+Windows and Ubuntu paths are hints, not guaranteed locations. Read the active
+Cline or compatible fork's documentation/configuration and reuse its native
+paths when the fork inherits them. If the host or target directories cannot be
+identified, or more than one plausible target exists, report the gap instead of
+guessing or creating an unused directory.
+Do not ask for separate confirmation for each bundled Skill. Do not claim that
+project onboarding happened before a workspace task actually runs.
 
 ## Task routing
 
@@ -114,7 +122,7 @@ When a request can be completed from the user's text or one text attachment or
 text file, without reading the project, running commands, modifying files, or
 checking runtime state, you may suggest that the user use a separate chat page
 for the analysis. This is only a lightweight suggestion, not a workflow stage
-or Skill. Image analysis is not included in this version.
+or Skill.
 
 Suggest it only when the input or discussion is large enough for moving the
 analysis out of the current task to be useful. Give the user a short prompt and

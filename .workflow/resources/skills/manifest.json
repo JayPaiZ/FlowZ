@@ -10,6 +10,25 @@
   "installation": {
     "cline": {
       "installer": "install-flowz-cline.ps1",
+      "platformInstallers": {
+        "windows": "install-flowz-cline.ps1",
+        "ubuntu": "install-flowz-cline.sh"
+      },
+      "platformDetection": "agent-detects-windows-or-ubuntu-before-install",
+      "targetResolution": {
+        "mode": "agent-detect-and-pass-explicit-overrides",
+        "defaultPathsAreHints": true,
+        "reuseInheritedNativeConfig": true,
+        "onAmbiguous": "stop-and-report",
+        "windowsHints": {
+          "skills": "%USERPROFILE%/.cline/skills",
+          "rules": "%USERPROFILE%/.cline/rules"
+        },
+        "ubuntuHints": {
+          "skills": "$HOME/.cline/skills",
+          "rules": "$HOME/.cline/rules"
+        }
+      },
       "mode": "user-global",
       "targetCandidates": [
         "%USERPROFILE%/.cline/skills"
@@ -27,7 +46,7 @@
           "name": "flowz-global",
           "sourcePath": "../cline/rules/flowz-global.md",
           "installFile": "flowz-global.md",
-          "sha256": "CFDC3E6972CCF1CCC12AB9E12449CE84AA84D571E41CE6772E51772E11C33D28"
+          "sha256": "79D80A8D64728534AC8DEB424377A4692ED13FD8CFD8D77294D5DF982F320B46"
         }
       ],
       "projectIntegration": "first-task-idempotent",

@@ -1,0 +1,6 @@
+# Task state is created locally by the Agent when a task needs persistence.
+.workflow/tasks/
+
+# Local planning and temporary artifact workspaces are not distribution files.
+.superpowers/
+tmp/
