@@ -146,13 +146,13 @@ one efficiency rule at a time and revert it if completion quality deteriorates.
 Do not claim a token reduction or a completion-rate improvement without
 measured evidence.
 
-### Optional external chat assistance
+### Optional conversational AI assistance
 
-The Agent may suggest a separate user-operated chat page when the current
-request can be completed from the user's text or one text attachment/text file
-without reading the project, running commands, modifying files, or checking
-runtime state. This is a lightweight suggestion, not a new workflow stage or
-Skill.
+The Agent may suggest a separate user-operated conversational AI page after the
+user enables this assistance, when the current request can be completed from
+the user's text or one text attachment/text file without reading the project,
+running commands, modifying files, or checking runtime state. This is a
+lightweight suggestion, not a new workflow stage or Skill.
 
 Suggest it only when the input or discussion is large enough that moving the
 analysis out of the current task is likely to help. The user decides whether
@@ -162,9 +162,10 @@ use it as an unverified reference and do not repeat the same analysis through
 another Skill. Do not suggest the page for implementation, project-specific
 debugging, command execution, or verification work.
 
-Proactive suggestions are enabled by default. An explicit user request to
-enable or disable these suggestions takes precedence and remains in effect for
-the applicable conversation or workspace scope.
+These suggestions are disabled by default. The Agent must not proactively
+suggest them until the user explicitly asks to enable or open conversational
+AI assistance. An explicit request to disable the assistance takes precedence
+and remains in effect for the applicable conversation or workspace scope.
 
 ### Quick
 

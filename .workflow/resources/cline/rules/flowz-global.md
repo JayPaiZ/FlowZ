@@ -116,13 +116,13 @@ Agent. During ordinary development tasks, do not calculate, display, or request
 hashes; hash checks belong only to installers or explicitly integrity-sensitive
 tooling.
 
-## Optional external chat assistance
+## Optional conversational AI assistance
 
 When a request can be completed from the user's text or one text attachment or
 text file, without reading the project, running commands, modifying files, or
-checking runtime state, you may suggest that the user use a separate chat page
-for the analysis. This is only a lightweight suggestion, not a workflow stage
-or Skill.
+checking runtime state, you may suggest that the user use a separate
+conversational AI page for the analysis after the user enables this assistance.
+This is only a lightweight suggestion, not a workflow stage or Skill.
 
 Suggest it only when the input or discussion is large enough for moving the
 analysis out of the current task to be useful. Give the user a short prompt and
@@ -131,9 +131,10 @@ reference and do not repeat the same analysis through another Skill. Do not
 suggest it for implementation, project-specific debugging, command execution,
 or verification.
 
-These suggestions are enabled by default. An explicit user request to enable
-or disable them takes precedence for the applicable conversation or workspace
-scope.
+These suggestions are disabled by default. Do not proactively suggest them
+until the user explicitly asks to enable or open conversational AI assistance.
+An explicit user request to disable the assistance takes precedence for the
+applicable conversation or workspace scope.
 
 ## Scope and verification
 
