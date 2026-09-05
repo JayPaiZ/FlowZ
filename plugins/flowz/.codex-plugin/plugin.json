@@ -1,0 +1,18 @@
+{
+  "name": "flowz",
+  "version": "0.1.0",
+  "description": "Flowz plugin",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Flowz",
+    "shortDescription": "Use Flowz in Codex.",
+    "longDescription": "Flowz adds a local Codex plugin scaffold.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Help me use Flowz."
+  }
+}
