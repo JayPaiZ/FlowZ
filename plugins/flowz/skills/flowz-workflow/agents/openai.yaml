@@ -1,0 +1,4 @@
+interface:
+  display_name: "FlowZ Workflow"
+  short_description: "Route FlowZ tasks through host Plan policies"
+  default_prompt: "Use $flowz-workflow to choose task depth and coordinate Plan execution."
