@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import sys
 from pathlib import Path
@@ -16,6 +17,9 @@ _STATE_KEYS = (
     "user_validation_enabled",
     "plan_state",
 )
+
+_MINIMAL_CONTEXT = "FlowZ routing: enabled; hook state unavailable."
+_STATE_ERROR: str | None = None
 
 _CONTROL_COMMANDS = {
     "暂停 flowz": "pause_flowz",
@@ -67,9 +71,14 @@ def apply_control(state: Mapping[str, object], action: str) -> dict[str, object]
 
 
 def _safe_session_name(session_id: str) -> str:
-    value = str(session_id or "session").strip()
-    value = re.sub(r"[^A-Za-z0-9._-]", "_", value)
-    return value[:128] or "session"
+    raw_value = str(session_id or "session")
+    value = raw_value.strip() or "session"
+    safe_value = re.sub(r"[^A-Za-z0-9._-]", "_", value) or "session"
+    # Keep a readable prefix while hashing the original ID so sanitization and
+    # truncation cannot cause two sessions to share a state file.
+    digest = hashlib.sha256(raw_value.encode("utf-8")).hexdigest()[:20]
+    prefix = safe_value[:105]
+    return f"{prefix}--{digest}"
 
 
 def _state_path(data_root: Path | None, session_id: str) -> Path | None:
@@ -87,6 +96,12 @@ def _persistable_state(state: Mapping[str, object]) -> dict[str, object]:
     return defaults
 
 
+def _record_state_error(operation: str, exc: BaseException) -> None:
+    global _STATE_ERROR
+    _STATE_ERROR = f"{operation} failed ({type(exc).__name__})"
+    print(f"FlowZ hook diagnostic: {_STATE_ERROR}", file=sys.stderr)
+
+
 def load_state(data_root: Path | None, session_id: str) -> dict[str, object]:
     path = _state_path(data_root, session_id)
     if path is None:
@@ -94,9 +109,13 @@ def load_state(data_root: Path | None, session_id: str) -> dict[str, object]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
+            _record_state_error("load_state", ValueError("state payload must be an object"))
             return default_state()
         return _persistable_state(payload)
-    except (OSError, ValueError, TypeError):
+    except FileNotFoundError:
+        return default_state()
+    except (OSError, ValueError, TypeError) as exc:
+        _record_state_error("load_state", exc)
         return default_state()
 
 
@@ -110,8 +129,8 @@ def save_state(data_root: Path | None, session_id: str, state: Mapping[str, obje
             json.dumps(_persistable_state(state), ensure_ascii=False, sort_keys=True),
             encoding="utf-8",
         )
-    except (OSError, TypeError, ValueError):
-        return
+    except (OSError, TypeError, ValueError) as exc:
+        _record_state_error("save_state", exc)
 
 
 def clear_state(data_root: Path | None, session_id: str) -> None:
@@ -120,8 +139,8 @@ def clear_state(data_root: Path | None, session_id: str) -> None:
         return
     try:
         path.unlink(missing_ok=True)
-    except OSError:
-        return
+    except OSError as exc:
+        _record_state_error("clear_state", exc)
 
 
 def render_context(state: Mapping[str, object]) -> str:
@@ -149,16 +168,21 @@ def _result(event_name: str, context: str = "") -> dict[str, object]:
 
 
 def handle_event(event: Mapping[str, object], env: Mapping[str, str]) -> Mapping[str, object]:
-    event_name = event.get("hook_event_name")
-    if event_name not in {"SessionStart", "UserPromptSubmit", "SessionEnd"}:
-        return {"continue": True}
-    session_id = str(event.get("session_id") or "session")
-    data_root_value = env.get("PLUGIN_DATA")
-    data_root = Path(data_root_value) if data_root_value else None
+    global _STATE_ERROR
+    _STATE_ERROR = None
     try:
+        if not isinstance(event, Mapping):
+            raise TypeError("hook input must be a mapping")
+        event_name = event.get("hook_event_name")
+        if event_name not in {"SessionStart", "UserPromptSubmit", "SessionEnd"}:
+            return {"continue": True}
+        session_id = str(event.get("session_id") or "session")
+        data_root_value = env.get("PLUGIN_DATA")
+        data_root = Path(data_root_value) if data_root_value else None
         if event_name == "SessionEnd":
             clear_state(data_root, session_id)
-            return _result("SessionEnd")
+            context = _MINIMAL_CONTEXT if _STATE_ERROR else ""
+            return _result("SessionEnd", context)
 
         state = load_state(data_root, session_id)
         if event_name == "UserPromptSubmit":
@@ -166,10 +190,15 @@ def handle_event(event: Mapping[str, object], env: Mapping[str, str]) -> Mapping
             if action:
                 state = apply_control(state, action)
         save_state(data_root, session_id, state)
+        if _STATE_ERROR:
+            return _result(str(event_name), _MINIMAL_CONTEXT)
         return _result(str(event_name), render_context(state))
     except Exception as exc:
-        print(f"FlowZ hook diagnostic: {exc}", file=sys.stderr)
-        return _result(str(event_name), "FlowZ routing: enabled; hook state unavailable.")
+        _record_state_error("handle_event", exc)
+        event_name = locals().get("event_name")
+        if event_name in {"SessionStart", "UserPromptSubmit", "SessionEnd"}:
+            return _result(str(event_name), _MINIMAL_CONTEXT)
+        return {"continue": True}
 
 
 def main() -> int:
@@ -183,12 +212,12 @@ def main() -> int:
         })
         json.dump(result, sys.stdout, ensure_ascii=False)
         sys.stdout.write("\n")
-        return 0
+        return 1 if _STATE_ERROR else 0
     except Exception as exc:
-        print(f"FlowZ hook diagnostic: {exc}", file=sys.stderr)
+        _record_state_error("main", exc)
         json.dump({"continue": True}, sys.stdout)
         sys.stdout.write("\n")
-        return 0
+        return 1
 
 
 if __name__ == "__main__":

@@ -3,6 +3,8 @@ import os
 import subprocess
 import sys
 import tempfile
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 import unittest
 
@@ -15,6 +17,8 @@ from plugins.flowz.hooks.flowz_hook import (
     parse_control_command,
     render_context,
     save_state,
+    _safe_session_name,
+    _state_path,
 )
 
 
@@ -80,6 +84,34 @@ class HookStateTests(unittest.TestCase):
             next_result = handle_event(ordinary, env)
             self.assertNotIn("FlowZ routing", next_result["hookSpecificOutput"]["additionalContext"])
 
+    def test_resume_fixture_restores_flowz_without_enabling_other_toggles(self):
+        with tempfile.TemporaryDirectory() as raw:
+            env = {"PLUGIN_DATA": raw}
+            pause = read_fixture("pause.json")
+            resume = read_fixture("resume.json")
+            pause_result = handle_event(pause, env)
+            self.assertIn("paused", pause_result["hookSpecificOutput"]["additionalContext"])
+            resume_result = handle_event(resume, env)
+            context = resume_result["hookSpecificOutput"]["additionalContext"]
+            self.assertIn("FlowZ routing: enabled", context)
+            self.assertIn("ChatGPT web assistance: off", context)
+            self.assertIn("user validation suggestions: off", context)
+
+    def test_optional_toggles_are_independent(self):
+        with tempfile.TemporaryDirectory() as raw:
+            env = {"PLUGIN_DATA": raw}
+            event = read_fixture("session-start.json")
+            event.update({"hook_event_name": "UserPromptSubmit", "prompt": "打开 ChatGPT 网页版辅助"})
+            result = handle_event(event, env)
+            context = result["hookSpecificOutput"]["additionalContext"]
+            self.assertIn("ChatGPT web assistance: on", context)
+            self.assertIn("user validation suggestions: off", context)
+            event["prompt"] = "打开用户验证建议"
+            result = handle_event(event, env)
+            context = result["hookSpecificOutput"]["additionalContext"]
+            self.assertIn("ChatGPT web assistance: on", context)
+            self.assertIn("user validation suggestions: on", context)
+
     def test_state_file_never_contains_prompt(self):
         with tempfile.TemporaryDirectory() as raw:
             data_root = Path(raw)
@@ -87,8 +119,22 @@ class HookStateTests(unittest.TestCase):
             event = read_fixture("session-start.json")
             event.update({"session_id": "session-a", "hook_event_name": "UserPromptSubmit", "prompt": prompt})
             handle_event(event, {"PLUGIN_DATA": str(data_root)})
-            contents = (data_root / "session-a.json").read_text(encoding="utf-8")
+            contents = _state_path(data_root, "session-a").read_text(encoding="utf-8")
             self.assertNotIn(prompt, contents)
+
+    def test_session_names_cannot_collide_after_sanitization_or_truncation(self):
+        self.assertNotEqual(_safe_session_name("a/b"), _safe_session_name("a?b"))
+        long_a = "x" * 200 + "A"
+        long_b = "x" * 200 + "B"
+        self.assertNotEqual(_safe_session_name(long_a), _safe_session_name(long_b))
+        self.assertLessEqual(len(_safe_session_name(long_a)), 128)
+        with tempfile.TemporaryDirectory() as raw:
+            data_root = Path(raw)
+            save_state(data_root, "a/b", default_state())
+            save_state(data_root, "a?b", default_state())
+            self.assertEqual(len(list(data_root.glob("*.json"))), 2)
+            clear_state(data_root, "a/b")
+            self.assertTrue(_state_path(data_root, "a?b").exists())
 
     def test_missing_or_unwritable_data_root_does_not_raise(self):
         event = read_fixture("session-start.json")
@@ -103,8 +149,29 @@ class HookStateTests(unittest.TestCase):
             event = read_fixture("session-end.json")
             event["session_id"] = "session-a"
             handle_event(event, {"PLUGIN_DATA": str(data_root)})
-            self.assertFalse((data_root / "session-a.json").exists())
-            self.assertTrue((data_root / "session-b.json").exists())
+            self.assertFalse(_state_path(data_root, "session-a").exists())
+            self.assertTrue(_state_path(data_root, "session-b").exists())
+
+    def test_persistence_errors_emit_diagnostics_and_minimal_context(self):
+        event = read_fixture("session-start.json")
+        with tempfile.TemporaryDirectory() as raw:
+            data_root = Path(raw) / "state-root"
+            data_root.write_text("not a directory", encoding="utf-8")
+            diagnostics = StringIO()
+            with redirect_stderr(diagnostics):
+                result = handle_event(event, {"PLUGIN_DATA": str(data_root)})
+        self.assertEqual(result["hookSpecificOutput"]["additionalContext"], "FlowZ routing: enabled; hook state unavailable.")
+        self.assertIn("FlowZ hook diagnostic", diagnostics.getvalue())
+
+    def test_hooks_json_schema_contains_all_events_and_command_fields(self):
+        hooks = json.loads((ROOT / "plugins/flowz/hooks/hooks.json").read_text(encoding="utf-8"))
+        self.assertIsInstance(hooks.get("hooks"), dict)
+        for event_name in ("SessionStart", "UserPromptSubmit", "SessionEnd"):
+            command = hooks["hooks"][event_name][0]["hooks"][0]
+            self.assertEqual(command["type"], "command")
+            self.assertIn("${PLUGIN_ROOT}", command["command"])
+            self.assertIn("%PLUGIN_ROOT%", command["commandWindows"])
+            self.assertIsInstance(command["timeout"], int)
 
     def test_unknown_event_has_no_context_delta(self):
         event = {"hook_event_name": "Unknown", "session_id": "session-a"}
@@ -133,11 +200,20 @@ class HookStateTests(unittest.TestCase):
                 text=True,
                 capture_output=True,
                 env=env,
-                check=True,
+                check=False,
             )
+            self.assertEqual(completed.returncode, 0)
             payload = json.loads(completed.stdout)
             self.assertTrue(payload["continue"])
             self.assertEqual(payload["hookSpecificOutput"]["hookEventName"], "SessionStart")
+
+    def test_malformed_stdin_returns_nonzero_and_nonblocking_json(self):
+        completed = subprocess.run(
+            [sys.executable, str(HOOK)], input="not-json", text=True, capture_output=True
+        )
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertEqual(json.loads(completed.stdout), {"continue": True})
+        self.assertIn("diagnostic", completed.stderr)
 
 
 if __name__ == "__main__":
