@@ -1,0 +1,4 @@
+interface:
+  display_name: "FlowZ Onboarding"
+  short_description: "Prepare optional FlowZ Skill dependencies"
+  default_prompt: "检查并准备 FlowZ 的可选第三方 Skill。"

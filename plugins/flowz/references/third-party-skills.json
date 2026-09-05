@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "dependencies": {
+    "humanizer-zh": {
+      "canonical": "humanizer-zh",
+      "aliases": [],
+      "repository": "op7418/Humanizer-zh",
+      "path": "SKILL.md",
+      "installName": "humanizer-zh",
+      "optional": true,
+      "purpose": "中文文本处理"
+    },
+    "humanizer": {
+      "canonical": "humanizer",
+      "aliases": ["humanizer-en"],
+      "repository": "blader/humanizer",
+      "path": "SKILL.md",
+      "installName": "humanizer",
+      "optional": true,
+      "purpose": "英文文本处理"
+    },
+    "grilling": {
+      "canonical": "grilling",
+      "aliases": [],
+      "repository": "mattpocock/skills",
+      "path": "skills/productivity/grilling",
+      "installName": "grilling",
+      "optional": true,
+      "purpose": "方案质询"
+    },
+    "gstack-openclaw-office-hours": {
+      "canonical": "gstack-openclaw-office-hours",
+      "aliases": ["office-hours"],
+      "repository": "garrytan/gstack",
+      "path": "openclaw/skills/gstack-openclaw-office-hours",
+      "installName": "gstack-openclaw-office-hours",
+      "optional": true,
+      "purpose": "产品构思"
+    }
+  }
+}
