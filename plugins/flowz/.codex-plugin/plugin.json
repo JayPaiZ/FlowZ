@@ -1,18 +1,41 @@
 {
   "name": "flowz",
   "version": "0.1.0",
-  "description": "Flowz plugin",
+  "description": "FlowZ 为 Codex 提供主动的 Plan、推理与长任务工作流编排。",
   "author": {
-    "name": "Local developer"
+    "name": "JayPaiZ",
+    "url": "https://github.com/JayPaiZ"
   },
+  "homepage": "https://github.com/JayPaiZ/FlowZ",
+  "repository": "https://github.com/JayPaiZ/FlowZ",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "workflow",
+    "plan",
+    "reasoning",
+    "productivity"
+  ],
   "skills": "./skills/",
   "interface": {
-    "displayName": "Flowz",
-    "shortDescription": "Use Flowz in Codex.",
-    "longDescription": "Flowz adds a local Codex plugin scaffold.",
-    "developerName": "Local developer",
+    "displayName": "FlowZ",
+    "shortDescription": "主动编排 Codex Plan 与长任务执行",
+    "longDescription": "FlowZ 帮助 Codex 选择合适的任务深度、使用宿主 Plan、保护用户已有工作流，并在批准边界内连续执行和验证。",
+    "developerName": "JayPaiZ",
     "category": "Productivity",
-    "capabilities": [],
-    "defaultPrompt": "Help me use Flowz."
+    "capabilities": [
+      "Plan",
+      "Workflow",
+      "Skills",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "为这个任务选择 Quick、Standard 或 Full，并说明是否需要 Plan。",
+      "按 FlowZ 规则检查现有工作流冲突，再开始执行。",
+      "在批准边界内连续实施并自动完成验证。"
+    ],
+    "brandColor": "#1F2937",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/logo.png"
   }
 }
