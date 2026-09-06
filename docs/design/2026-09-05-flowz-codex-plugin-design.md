@@ -1,7 +1,7 @@
 # FlowZ Codex 插件版设计
 
 生成日期：2026-09-05
-状态：DRAFT（等待书面审阅）
+状态：APPROVED（2026-09-05）
 目标分支：`main`
 保留分支：`FlowZ-Cline`
 
@@ -25,7 +25,7 @@ FlowZ 应该主动工作，但不应改变用户的项目规则、配置或第�
 
 ### 范围
 
-- Codex CLI 和 ChatGPT 桌面版 Codex 的 skills-only 插件；
+- Codex CLI 和 ChatGPT 桌面版 Codex 的 Skills + Hook 插件；
 - 本地/个人 marketplace 安装；
 - 完整插件元数据：作者 `JayPaiZ`、MIT 许可证、仓库和主页、描述、品牌色以及图标字段；
 - Quick / Standard / Full 任务分流；
@@ -44,7 +44,6 @@ FlowZ 应该主动工作，但不应改变用户的项目规则、配置或第�
 - 不修改用户或项目的 `AGENTS.md`、Skill、插件或 `config.toml`；
 - 不把 FlowZ 规则写入用户项目目录；
 - 不提供 MCP、自定义 UI 或 IDE 专用适配；
-- 不主动管理或更新第三方 Skill；
 - 不提交公共插件目录；
 - 不在 `main` 保留 Cline 专用运行时文件或面向领导的 PDF 使用说明。
 
@@ -127,6 +126,8 @@ FlowZ 遵循宿主实际优先级，不宣称能够绕过更高层约束。对 F
 5. 同一任务中的相同冲突只报告一次。
 
 无法确定是否冲突时，默认不覆盖已有规则，并记录为待确认项。
+冲突标识固定为 `<source-locator>:<rule-slug>`，使用稳定来源定位和小写规则短名，
+不包含易变行号或阶段编号；同一来源/动作组合必须复用同一标识。
 
 ### 4.3 Superpowers 和其他等价工作流
 
@@ -141,7 +142,7 @@ FlowZ 不依赖、安装或复制 Superpowers。只有当 Superpowers 或其他�
 
 ## 5. 插件结构与职责
 
-首版采用 skills-only 插件，不加入 MCP 或自定义 UI：
+首版采用 Skills + Hook 插件，不加入 MCP 或自定义 UI：
 
 ```text
 FlowZ/
@@ -152,9 +153,10 @@ FlowZ/
    ├─ .codex-plugin/plugin.json
    ├─ skills/
    │  ├─ flowz-workflow/
+   │  │  └─ references/runtime-state.md
    │  └─ flowz-onboarding/
+   │     └─ references/third-party-skills.json
    ├─ hooks/hooks.json
-   ├─ references/
    └─ assets/
       ├─ logo.png
       └─ icon.png
@@ -186,12 +188,13 @@ FlowZ/
 - 最终失败只报告，不阻断 FlowZ 核心能力；
 - 用户明确要求时支持手动重试或查看诊断。
 
-“手动重试或诊断”表示不会在每一轮任务中反复安装；用户明确提出重试或查看冲突时才再次执行相应检查。
+“手动重试或诊断”表示不会在每一轮任务中反复安装；只有用户明确提出重试时才再次安装，查看诊断只展示已保存结果，不重新检查或安装。
 
 ### 5.3 Hook
 
 - `SessionStart`：注入一次紧凑的 FlowZ 核心路由和会话状态；
 - `UserPromptSubmit`：处理暂停/恢复/功能开关，并触发启用状态下的任务分流；
+- `Stop`：只解析 FlowZ 输出的紧凑状态标记，保存可审阅的任务状态；
 - `SessionEnd`：清理会话状态；
 - Hook 只做确定性的生命周期工作，不把用户提示全文写入持久状态；
 - 首次使用需要遵从宿主的 Hook 审核和信任机制。
@@ -203,11 +206,19 @@ FlowZ/
 - `flowz_enabled`；
 - `chatgpt_web_assist_enabled`；
 - `user_validation_enabled`；
+- onboarding 检查状态和暂停期间排队的一次重试；
 - 当前任务层级和 Plan 阶段；
 - 紧凑任务包；
 - 已报告的冲突标识。
 
-不得保存用户原始提示、凭据或无关项目内容。压缩后恢复这些状态，`SessionEnd` 后清理。
+Hook 不直接持久化 `UserPromptSubmit` 的原始提示或 `Stop` 收到的完整答复；持久状态只能来自标记中的白名单、限长字段。`flowz-workflow` 和 `flowz-onboarding` 不得把原始提示、隐藏推理、凭据或无关项目内容放入标记，Hook 另行过滤明显的凭据形态。Hook 无法仅凭字符串可靠判断一段合法摘要是否在语义上复述了输入，因此这一隐私边界同时依赖 Skill 契约和 Hook 的结构化防护。压缩后恢复这些状态，`SessionEnd` 后清理。
+
+任务状态由 `flowz-workflow` 在可见答复绝对末尾顶格追加唯一的单行 JSON 标记，`Stop` Hook
+要求标记带有当前轮换 nonce，只保存白名单字段，不保存完整答复。正文、代码块、重复、
+缺少或使用过期 nonce 的标记都会被忽略。标记只能包含用户可审阅的摘要，不能更改插件
+开关、schema 版本或注入隐藏推理；非法字段和值会被忽略。这样既不要求 Hook 推测
+Agent 的内部判断，也能让 `SessionStart` 在压缩后恢复已批准边界和一次性冲突记录。
+冲突记录在同一任务内只能追加，空数组不能清除；只有下一项实际任务开始或会话结束时重置。
 
 ### 6.1 全局插件开关
 
@@ -219,6 +230,9 @@ FlowZ/
 - “恢复 FlowZ”：从下一轮用户消息起重新启用；
 - “打开/关闭 ChatGPT 网页版辅助”：只影响该功能；
 - “打开/关闭用户验证建议”：只影响该功能。
+
+FlowZ 暂停期间提出的第三方 Skill 重试会排队，并在用户明确恢复 FlowZ 后执行一次；
+查看诊断始终只展示已保存结果。
 
 ChatGPT 网页版辅助和用户验证建议默认关闭。用户验证建议关闭时，Agent 仍负责所有可执行的普通验证；开启后也不能转移安全、数据完整性和关键回归验证责任。
 
@@ -233,7 +247,10 @@ FlowZ 不复制第三方 Skill，不把它们改名为 `flowz-*`，也不把它�
 | 方案质询 | `grilling` | — | `mattpocock/skills` 的 `skills/productivity/grilling` |
 | 产品构思 | `gstack-openclaw-office-hours` | `office-hours` | `garrytan/gstack` 的 `openclaw/skills/gstack-openclaw-office-hours` |
 
-已安装规范名或兼容别名都视为满足依赖；不覆盖用户已有版本。中文和英文 Humanizer 继续严格分开，第三方 Skill 缺失时 FlowZ 核心仍可运行。
+已安装规范名或兼容别名都视为满足依赖；不覆盖用户已有版本。中文和英文 Humanizer
+继续严格分开：双语内容按清晰段落/片段分配，同一混合段落不能同时交给两个 Skill；
+用户在同一请求中显式指定两者时，只询问一次分别处理还是仅选一个，再等待回答。
+第三方 Skill 缺失时 FlowZ 核心仍可运行。
 
 ## 8. 图标与品牌资产
 

@@ -17,3 +17,12 @@ or silently reinterpret an existing Skill, plugin, workflow, or `AGENTS.md`.
 The report should name the conflicting source, the skipped FlowZ action, and
 the safe consequence. Do not repeat the same conflict report after compression
 or during later steps of the same task.
+
+For runtime de-duplication, derive the conflict ID as
+`<source-locator>:<rule-slug>`: use the shortest stable source locator available
+(for example `agents.md` or `skill:office-hours`) and a lowercase,
+hyphen-separated slug for the conflicting rule or skipped FlowZ action. Omit
+volatile line numbers, message wording, and step numbers. Reuse the same ID for
+the same source/action pair throughout the task. Before reporting, compare the
+derived ID case-insensitively with `already reported conflicts`; if present,
+skip only the duplicate report, not the safe consequence.

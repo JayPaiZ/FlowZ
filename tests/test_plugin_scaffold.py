@@ -18,6 +18,8 @@ class PluginScaffoldTests(unittest.TestCase):
         plugin = json.loads(manifest.read_text(encoding="utf-8"))
         catalog = json.loads(marketplace.read_text(encoding="utf-8"))
         self.assertEqual(plugin["name"], "flowz")
+        self.assertEqual(catalog["name"], "flowz-local")
+        self.assertEqual(catalog["interface"]["displayName"], "FlowZ Local")
         self.assertIn("version", plugin)
         self.assertIn("description", plugin)
         self.assertEqual(len(catalog["plugins"]), 1)

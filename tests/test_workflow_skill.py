@@ -94,8 +94,68 @@ class WorkflowSkillTests(unittest.TestCase):
             "next user turn",
         ):
             self.assertIn(phrase.lower(), self.normalized)
-        for name in ("plan-policy.md", "conflict-policy.md", "host-adaptation.md"):
+        for name in (
+            "plan-policy.md",
+            "conflict-policy.md",
+            "host-adaptation.md",
+            "runtime-state.md",
+        ):
             self.assertTrue((SKILL_DIR / "references" / name).is_file(), name)
+
+    def test_optional_switches_have_enabled_behavior_not_only_boolean_state(self):
+        host = (SKILL_DIR / "references" / "host-adaptation.md").read_text(
+            encoding="utf-8"
+        )
+        normalized = re.sub(r"\s+", " ", host).lower()
+        for phrase in (
+            "when chatgpt web assistance is on",
+            "visible browser capability",
+            "when user validation suggestions are on",
+            "non-critical",
+            "environment-specific",
+            "critical regression",
+        ):
+            self.assertIn(phrase.lower(), normalized)
+
+    def test_humanizer_language_routing_keeps_the_two_skills_distinct(self):
+        for phrase in (
+            "Chinese output",
+            "humanizer-zh",
+            "English output",
+            "humanizer",
+            "humanizer-en",
+            "never substitute",
+            "same passage",
+        ):
+            self.assertIn(phrase.lower(), self.normalized)
+
+    def test_humanizer_mixed_language_and_explicit_dual_request_have_one_route(self):
+        for phrase in (
+            "mixed-language passage",
+            "ask once",
+            "same paragraph",
+            "explicitly requests both",
+            "separate sections",
+        ):
+            self.assertIn(phrase.lower(), self.normalized)
+
+    def test_runtime_state_reference_defines_reviewable_stop_marker(self):
+        state = (SKILL_DIR / "references" / "runtime-state.md").read_text(
+            encoding="utf-8"
+        )
+        normalized = re.sub(r"\s+", " ", state).casefold()
+        for phrase in (
+            "<!-- flowz-state:",
+            "task_depth",
+            "plan_phase",
+            "context_package",
+            "reported_conflict_ids",
+            "onboarding_status",
+            "marker_nonce",
+            "never include the original user prompt",
+            "Stop hook",
+        ):
+            self.assertIn(phrase.casefold(), normalized)
 
     def test_supporting_references_cover_required_policies(self):
         for name, phrases in {
@@ -114,6 +174,9 @@ class WorkflowSkillTests(unittest.TestCase):
                 "skip",
                 "report once",
                 "do not modify",
+                "source locator",
+                "rule-slug",
+                "same id",
             ),
             "host-adaptation.md": (
                 "CLI",
@@ -121,6 +184,13 @@ class WorkflowSkillTests(unittest.TestCase):
                 "host Plan",
                 "next user turn",
                 "not promise hot loading",
+            ),
+            "runtime-state.md": (
+                "task_depth",
+                "plan_phase",
+                "context_package",
+                "reported_conflict_ids",
+                "onboarding_status",
             ),
         }.items():
             text = (SKILL_DIR / "references" / name).read_text(encoding="utf-8")

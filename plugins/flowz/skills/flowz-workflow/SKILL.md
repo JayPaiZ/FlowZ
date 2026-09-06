@@ -15,6 +15,8 @@ Read the relevant reference before applying detailed policy:
   one-time conflict report.
 - [Host adaptation](references/host-adaptation.md) defines CLI and desktop
   behavior and session switches.
+- [Runtime state](references/runtime-state.md) defines the compact state marker
+  used for task continuity and conflict de-duplication.
 
 ## Depth routing
 
@@ -45,6 +47,22 @@ Respect Superpowers only when it is visibly loaded and active in the current
 session. Superpowers is not a FlowZ dependency, and this skill does not require
 any particular Superpowers lifecycle.
 
+## Humanizer routing
+
+When a task calls for humanization and the matching optional Skill is installed,
+route Chinese output only to `humanizer-zh`. Route English output to
+`humanizer`, or to its installed compatible alias `humanizer-en`. Never
+substitute either language Skill for the other, infer routing from the shared
+word "humanizer", or apply both Skills to the same passage. For a bilingual
+deliverable, keep the language sections separate. For a mixed-language passage,
+split it at clear paragraph or segment boundaries and route each segment to its
+matching Skill; never apply both Skills to the same paragraph. If it cannot be
+split without changing the meaning, preserve the passage or ask which single
+language treatment should govern. If the user explicitly requests both Skills
+for one rewriting request, follow their shared upstream contract: ask once
+whether to process separate sections with both, use only `humanizer-zh`, or use
+only `humanizer`/`humanizer-en`, then wait before rewriting.
+
 ## Approval and continuity
 
 State reviewable assumptions, evidence, tradeoffs, and conclusions; do not
@@ -53,6 +71,13 @@ continue implementation and validation within the approved boundary without
 repeating approval requests. Pause for new evidence that overturns the plan,
 pause for out-of-scope work, a destructive operation, a permission or external action,
 an environment blocker, or a higher-priority project rule.
+
+When durable task state changes, append the compact, reviewable marker from
+`references/runtime-state.md`. The Hook uses it to restore the approved boundary
+after compaction and to avoid repeating a conflict report. Append exactly one
+unindented marker at the absolute end of the response and outside Markdown
+fences, copy the current Hook-supplied `marker_nonce`, and do not reuse a nonce.
+The marker is state, not a substitute for a user-facing conclusion.
 
 ChatGPT web assistance is off by default. User validation suggestions are off
 by default. The controls to pause FlowZ, resume FlowZ, or change either switch

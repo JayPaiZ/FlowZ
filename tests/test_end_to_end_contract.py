@@ -28,7 +28,7 @@ class EndToEndContractTests(unittest.TestCase):
     def test_marketplace_resolves_the_valid_plugin_manifest(self):
         marketplace = load_json(ROOT / ".agents/plugins/marketplace.json")
         entry = next(item for item in marketplace["plugins"] if item["name"] == "flowz")
-        self.assertEqual(marketplace["name"], "personal")
+        self.assertEqual(marketplace["name"], "flowz-local")
         self.assertEqual(entry["source"], {"source": "local", "path": "./plugins/flowz"})
 
         resolved_plugin = ROOT / entry["source"]["path"]
@@ -53,10 +53,14 @@ class EndToEndContractTests(unittest.TestCase):
         hooks_path = PLUGIN / "hooks/hooks.json"
         self.assertTrue(hooks_path.is_file())
         hooks = load_json(hooks_path)["hooks"]
-        self.assertEqual(set(hooks), {"SessionStart", "UserPromptSubmit", "SessionEnd"})
+        self.assertEqual(
+            set(hooks), {"SessionStart", "UserPromptSubmit", "Stop", "SessionEnd"}
+        )
 
     def test_all_optional_upstream_dependencies_are_resolvable(self):
-        catalog = load_json(PLUGIN / "references/third-party-skills.json")
+        catalog = load_json(
+            PLUGIN / "skills/flowz-onboarding/references/third-party-skills.json"
+        )
         expected = {
             "humanizer-zh",
             "humanizer",
@@ -68,7 +72,8 @@ class EndToEndContractTests(unittest.TestCase):
             self.assertEqual(dependency["canonical"], name)
             self.assertTrue(dependency["optional"])
             self.assertTrue(dependency["repository"])
-            self.assertTrue(dependency["path"])
+            self.assertTrue(dependency["installPath"])
+            self.assertFalse(dependency["installPath"].endswith(".md"))
 
     def test_readme_keeps_both_optional_switches_off_by_default(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
@@ -90,6 +95,17 @@ class EndToEndContractTests(unittest.TestCase):
             else []
         )
         self.assertEqual(remaining_files, [])
+
+    def test_design_and_implementation_records_match_the_approved_runtime(self):
+        design = (
+            ROOT / "docs/design/2026-09-05-flowz-codex-plugin-design.md"
+        ).read_text(encoding="utf-8")
+        implementation = (
+            ROOT / "docs/design/2026-09-05-flowz-codex-plugin-implementation-plan.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("状态：APPROVED", design)
+        self.assertNotIn("状态：DRAFT", design)
+        self.assertNotIn("REQUIRED SUB-SKILL", implementation)
 
 
 if __name__ == "__main__":

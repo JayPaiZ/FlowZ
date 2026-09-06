@@ -8,14 +8,14 @@ FlowZ 是一个面向 Codex 的本地插件：它会根据任务的风险、范�
 
 ```text
 codex plugin marketplace add <REPOSITORY_ROOT>
-codex plugin add flowz@personal
+codex plugin add flowz@flowz-local
 ```
 
 安装时按宿主提示审核插件的 Skill 和 Hook；安装完成后新开一个 Codex CLI 或桌面版会话，确保插件在会话开始时被加载。
 
 不同 Codex CLI 与桌面版的插件界面和能力可能略有差异。若当前界面没有本地 marketplace 入口，请使用该版本提供的插件管理入口，并指向同一个仓库根目录；不需要手动编辑 `config.toml` 或项目的 `AGENTS.md`。
 
-第一次处理实际任务时，FlowZ 会检查可选第三方 Skill 是否已可用。安装或检查失败不会阻断 FlowZ 的核心路由；它会说明失败点、受影响能力和下一步。只有你明确要求“重试安装”或“查看安装诊断”时，才会再次尝试。
+第一次处理实际任务时，FlowZ 会检查可选第三方 Skill 是否已可用。安装或检查失败不会阻断 FlowZ 的核心路由；它会说明失败点、受影响能力和下一步。只有你明确要求“重试安装第三方 Skill”时才会再次尝试；“查看安装诊断”只展示已保存的结果，不会重试或重新检查。
 
 ## FlowZ 如何选择工作深度
 
@@ -46,11 +46,13 @@ FlowZ 不依赖、安装或复制 Superpowers。只有 Superpowers 或其他等�
 - 说“打开/关闭 ChatGPT 网页版辅助”，只切换该独立功能。
 - 说“打开/关闭用户验证建议”，只切换该独立功能。
 
-ChatGPT 网页版辅助默认关闭，用户验证建议也默认关闭。关闭用户验证建议不会关闭 Agent 的正常自动验证；即使你打开建议，安全、数据完整性和关键回归检查的责任仍由 Agent 承担。插件的全局启用或禁用由 Codex 宿主管理，可靠的生效边界是新聊天或新的 CLI 会话，而不是承诺运行中会话热加载。
+ChatGPT 网页版辅助默认关闭，用户验证建议也默认关闭。打开 ChatGPT 网页版辅助后，FlowZ 只会在独立对话确有价值且宿主具有可见浏览器能力时提出或使用它，并会说明共享内容与结果如何并入当前任务；没有浏览器能力时只提供可复制的提示词，不会声称已经访问网页。
+
+关闭用户验证建议不会关闭 Agent 的正常自动验证。打开后，FlowZ 可以建议用户完成非关键、明显耗 token 或环境相关的检查，例如浏览器视觉效果、硬件行为或私有账号集成；安全、数据完整性和关键回归检查仍由 Agent 承担。插件的全局启用或禁用由 Codex 宿主管理，可靠的生效边界是新聊天或新的 CLI 会话，而不是承诺运行中会话热加载。
 
 ## 可选第三方 Skill
 
-FlowZ 仅记录以下可选能力，不复制、改名、覆盖或主动更新它们：
+FlowZ 仅记录以下可选能力，不复制、改名或覆盖它们：
 
 | 用途 | 规范名 | 兼容别名 |
 | --- | --- | --- |
@@ -59,7 +61,7 @@ FlowZ 仅记录以下可选能力，不复制、改名、覆盖或主动更新�
 | 方案质询 | `grilling` | — |
 | 产品构思 | `gstack-openclaw-office-hours` | `office-hours` |
 
-规范名或兼容别名已安装即视为满足。缺失时，FlowZ 先使用 Codex 原生 Skill Installer；若该路径失败，才按 [第三方目录](plugins/flowz/references/third-party-skills.json) 中记录的原作者 GitHub 仓库和路径回退。它不会自动替换为 Fork、同名替代项目或未记录来源，也不会把中文与英文文本处理 Skill 混用。
+规范名或兼容别名已安装即视为满足。缺失时，FlowZ 先使用 Codex 原生 Skill Installer；若该路径失败，才按 [第三方目录](plugins/flowz/skills/flowz-onboarding/references/third-party-skills.json) 中记录的原作者 GitHub 仓库和路径回退。目录分别记录供 Installer 使用的 Skill 目录和供来源定位使用的入口文件，根目录 Skill 不会再把 `SKILL.md` 当作安装目录。它不会自动替换为 Fork、同名替代项目或未记录来源，也不会把中文与英文文本处理 Skill 混用。
 
 ## 图标、作者与本地开发状态
 
@@ -69,6 +71,6 @@ FlowZ 由 [JayPaiZ](https://github.com/JayPaiZ) 维护，使用 MIT 许可证。
 
 ## 隐私与项目边界
 
-FlowZ 不会把规则或隐藏状态写入你的项目，不会修改项目 `AGENTS.md`、已有 Skill、插件或 `config.toml`。它不读取或输出凭据、`.env`、私有日志和无关运行数据；会话状态按会话隔离，不保存原始提示，并在会话结束时清理。
+FlowZ 不会把规则或隐藏状态写入你的项目，也不会修改项目 `AGENTS.md`、已有 Skill、插件或 `config.toml`。FlowZ 执行规则要求 Agent 不读取或输出凭据、`.env`、私有日志和无关运行数据。Hook 只读取当前提示来匹配明确的会话命令，不保存原始提示；`Stop` 只保存答复末尾标记中的白名单、限长摘要，不保存完整答复。规则也禁止把原始提示、隐藏推理或凭据放入该标记，Hook 还会过滤明显的凭据形态。会话状态按会话隔离，并在会话结束时清理。
 
 任何外部操作仍遵从 Codex 的权限、审核与项目规则。暂停或禁用 FlowZ 后，它不会通过遗留的项目文件继续生效。

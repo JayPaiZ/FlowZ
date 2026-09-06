@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${PLUGIN_ROOT}/hooks/flowz_hook.py\"",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/flowz_hook.py\"",
             "commandWindows": "python \"%PLUGIN_ROOT%\\hooks\\flowz_hook.py\"",
             "timeout": 10
           }
@@ -18,9 +18,21 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${PLUGIN_ROOT}/hooks/flowz_hook.py\"",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/flowz_hook.py\"",
             "commandWindows": "python \"%PLUGIN_ROOT%\\hooks\\flowz_hook.py\"",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/flowz_hook.py\"",
+            "commandWindows": "python \"%PLUGIN_ROOT%\\hooks\\flowz_hook.py\"",
+            "timeout": 3
           }
         ]
       }
@@ -30,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${PLUGIN_ROOT}/hooks/flowz_hook.py\"",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/flowz_hook.py\"",
             "commandWindows": "python \"%PLUGIN_ROOT%\\hooks\\flowz_hook.py\"",
             "timeout": 3
           }

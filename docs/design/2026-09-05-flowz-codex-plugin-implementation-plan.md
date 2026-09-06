@@ -1,12 +1,12 @@
 # FlowZ Codex Plugin Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Implementation record:** Steps use checkboxes to preserve the original execution plan. FlowZ does not require a particular external workflow or Skill to execute them.
 
-**Goal:** 在 `main` 上交付一个可由本地 marketplace 安装、同时适配 Codex CLI 与 ChatGPT 桌面版 Codex 的 FlowZ skills-only 插件，并保留 `FlowZ-Cline` 分支作为现有 Cline 版本。
+**Goal:** 在 `main` 上交付一个可由本地 marketplace 安装、同时适配 Codex CLI 与 ChatGPT 桌面版 Codex 的 FlowZ 插件，并保留 `FlowZ-Cline` 分支作为现有 Cline 版本。
 
 **Architecture:** `flowz-workflow` 负责 Quick / Standard / Full 分流、Plan 使用策略、推理策略、冲突保护和长任务契约；`flowz-onboarding` 负责第三方 Skill 首次准备与 GitHub 回退。Hook 只处理会话生命周期、显式开关和紧凑上下文状态；具体规划优先交给宿主 Plan，宿主不提供 Plan 时使用相同字段的结构化契约。
 
-**Tech Stack:** Codex plugin JSON schema、repo-local marketplace JSON、Markdown Skills、Codex hooks、Python 3 标准库（Hook 状态与测试）、PowerShell/System.Drawing（Windows 资产转换与检查）、内置 `image_gen`（圆形图标派生）。Hook 使用当前 Codex 0.153.0 的 `hooks/hooks.json` 默认发现和命令 Hook 协议。
+**Tech Stack:** Codex plugin JSON schema、repo-local marketplace JSON、Markdown Skills、Codex hooks、Python 3 标准库（Hook 状态与测试）、PowerShell/System.Drawing（Windows 资产转换与检查）、内置 `image_gen`（圆形图标派生）。Hook 使用已核实的 `hooks/hooks.json` 默认发现和命令 Hook 协议。
 
 **Spec:** `docs/design/2026-09-05-flowz-codex-plugin-design.md`
 
@@ -16,7 +16,7 @@
 
 - 目标分支是 `main`；`FlowZ-Cline` 必须在删除或迁移前保留当前 Cline 基线。
 - 插件名称统一为 `flowz`，目录名与 `.codex-plugin/plugin.json` 的 `name` 必须一致。
-- 插件首版是 skills-only；不加入 MCP、自定义 UI 或 IDE 专用适配。
+- 插件首版由 Skills 和 Hook 组成；不加入 MCP、自定义 UI 或 IDE 专用适配。
 - 作者字段使用 `JayPaiZ`，许可证使用 `MIT`，仓库和主页使用 `https://github.com/JayPaiZ/FlowZ`。
 - FlowZ 主动决定是否以及如何使用宿主 Plan，但不替代或复制 Plan。
 - 推理策略属于 Plan 使用策略；不修改用户模型选择、推理档位或 `config.toml`。
@@ -282,7 +282,7 @@ git commit -m "feat: add FlowZ plugin metadata and icon assets"
 ### Task 3: 建立第三方 Skill 目录与 onboarding Skill
 
 **Files:**
-- Create: `plugins/flowz/references/third-party-skills.json`
+- Create: `plugins/flowz/skills/flowz-onboarding/references/third-party-skills.json`
 - Create: `plugins/flowz/skills/flowz-onboarding/SKILL.md`
 - Create: `plugins/flowz/skills/flowz-onboarding/agents/openai.yaml`
 - Create: `tests/test_dependency_catalog.py`
@@ -294,29 +294,33 @@ git commit -m "feat: add FlowZ plugin metadata and icon assets"
 
 - [ ] **Step 1: 写依赖目录失败测试**
 
-在 `tests/test_dependency_catalog.py` 中要求 `third-party-skills.json` 具备 `schemaVersion: 1` 和四项唯一规范名，并验证下列精确映射：
+在 `tests/test_dependency_catalog.py` 中要求 `third-party-skills.json` 具备 `schemaVersion: 2` 和四项唯一规范名，并验证下列精确映射。`installPath` 必须是传给 Installer 的 Skill 目录，`sourceEntry` 单独记录来源入口：
 
 ```python
 EXPECTED = {
     "humanizer-zh": {
         "aliases": [],
         "repository": "op7418/Humanizer-zh",
-        "path": "SKILL.md",
+        "installPath": ".",
+        "sourceEntry": "SKILL.md",
     },
     "humanizer": {
         "aliases": ["humanizer-en"],
         "repository": "blader/humanizer",
-        "path": "SKILL.md",
+        "installPath": ".",
+        "sourceEntry": "SKILL.md",
     },
     "grilling": {
         "aliases": [],
         "repository": "mattpocock/skills",
-        "path": "skills/productivity/grilling",
+        "installPath": "skills/productivity/grilling",
+        "sourceEntry": "skills/productivity/grilling",
     },
     "gstack-openclaw-office-hours": {
         "aliases": ["office-hours"],
         "repository": "garrytan/gstack",
-        "path": "openclaw/skills/gstack-openclaw-office-hours",
+        "installPath": "openclaw/skills/gstack-openclaw-office-hours",
+        "sourceEntry": "openclaw/skills/gstack-openclaw-office-hours",
     },
 }
 ```
@@ -333,7 +337,7 @@ python -m unittest tests.test_dependency_catalog -v
 
 - [ ] **Step 3: 创建依赖目录**
 
-写入 `plugins/flowz/references/third-party-skills.json`：每项包含 `canonical`、`aliases`、`repository`、`path`、`installName`、`optional: true` 和用途说明；只记录仓库/路径，不复制上游正文。
+写入 onboarding Skill 自身的 `references/third-party-skills.json`：每项包含 `canonical`、`aliases`、`repository`、`installPath`、`sourceEntry`、`installName`、`optional: true` 和用途说明；只记录仓库/路径，不复制上游正文。
 
 - [ ] **Step 4: 编写 onboarding Skill**
 
@@ -342,12 +346,12 @@ python -m unittest tests.test_dependency_catalog -v
 1. 启用插件后的第一个实际任务执行一次依赖检查；
 2. 先检查规范名，再检查兼容旧别名；
 3. 优先使用 Codex 原生 Skill Installer；
-4. 原生安装失败后，只按目录中的原作者仓库/路径回退；
+4. 原生安装失败后，只按目录中的原作者仓库和 `installPath` 回退，`sourceEntry` 仅用于定位来源；
 5. 路径移动时只在原作者/原仓库内搜索；
 6. Fork 或同名替代品不自动换源；
-7. 不覆盖已有版本，不主动执行更新检查；
+7. 不覆盖已有版本；
 8. 单项失败只生成诊断，不阻断 `flowz-workflow`；
-9. 只有用户明确说“重试安装”或“查看安装诊断”时才再次执行；
+9. 只有用户明确要求重试时才再次安装；查看安装诊断只展示已保存结果；
 10. 依赖缺失时给出降级说明，不能伪造安装成功。
 
 Skill 中明确保留 `humanizer` 与 `humanizer-zh` 的中英文隔离；不要加入与当前目标无关的语言规则。
@@ -368,7 +372,7 @@ python "C:\Users\JayPai_Z\.codex\skills\.system\skill-creator\scripts\quick_vali
 - [ ] **Step 7: 提交 onboarding**
 
 ```powershell
-git add -- plugins/flowz/references/third-party-skills.json plugins/flowz/skills/flowz-onboarding tests/test_dependency_catalog.py tests/test_onboarding_skill.py
+git add -- plugins/flowz/skills/flowz-onboarding tests/test_dependency_catalog.py tests/test_onboarding_skill.py
 git commit -m "feat: add FlowZ third-party skill onboarding"
 ```
 
@@ -469,11 +473,11 @@ git commit -m "feat: add FlowZ workflow and Plan policy"
 
 **Interfaces:**
 - Consumes: Task 4 的 workflow Skill 和当前 Codex Hook schema。
-- Produces: 无项目写入、无原始提示持久化、可按 `session_id` 恢复的会话状态；Hook 失败时回退到最小 FlowZ 路由。
+- Produces: 无项目写入、Hook 不直接持久化原始提示或完整答复、可按 `session_id` 恢复的会话状态；Hook 失败时回退到最小 FlowZ 路由。
 
 - [ ] **Step 1: 固定当前 Codex Hook 协议**
 
-实现按已核实的 Codex 0.153.0 协议，不把 Hook 写进 `.codex-plugin/plugin.json`：插件默认从 `hooks/hooks.json` 发现配置，配置根为 `{"hooks": {...}}`，事件键使用 `SessionStart`、`UserPromptSubmit`、`SessionEnd`，每个事件值是 matcher group 数组，每个 group 的 `hooks` 数组包含命令处理器。命令处理器字段使用 `type: "command"`、`command`、Windows 专用 `commandWindows` 和 `timeout`。
+实现按已核实的 Codex Hook 协议，不把 Hook 写进 `.codex-plugin/plugin.json`：插件默认从 `hooks/hooks.json` 发现配置，配置根为 `{"hooks": {...}}`，事件键使用 `SessionStart`、`UserPromptSubmit`、`Stop`、`SessionEnd`，每个事件值是 matcher group 数组，每个 group 的 `hooks` 数组包含命令处理器。命令处理器字段使用 `type: "command"`、`command`、Windows 专用 `commandWindows` 和 `timeout`。
 
 运行时会把以下环境变量注入命令：`PLUGIN_ROOT`、`CLAUDE_PLUGIN_ROOT`、`PLUGIN_DATA`、`CLAUDE_PLUGIN_DATA`。命令当前工作目录是用户项目，因此脚本路径必须通过插件根环境变量解析，不能依赖 `./hooks` 相对当前项目目录。`SessionStart` 和 `UserPromptSubmit` 命令通过 stdout 返回 JSON；可审阅上下文使用：
 
@@ -487,7 +491,7 @@ git commit -m "feat: add FlowZ workflow and Plan policy"
 }
 ```
 
-`SessionEnd` 命令以退出码 `0` 完成清理并可保持空 stdout。Hook 失败不得阻断核心任务；非零退出码和诊断写入 stderr。实现后用 `validate_plugin.py` 验证 manifest 与 Skill，用本任务的 fixture 测试 Hook 行为。
+`Stop` 从 `last_assistant_message` 绝对末尾只解析一个顶格、带当前轮换 nonce 的 FlowZ 白名单状态标记；缺少、过期、位于正文/代码块内、格式损坏或重复的标记均忽略。`SessionEnd` 以退出码 `0` 完成清理。状态读写失败属于可恢复错误：输出最小安全 JSON、把诊断写入 stderr，并仍以 `0` 退出，使 Codex 保留 stdout 上下文。只有 stdin 或 Hook 协议本身无效时才非零退出。实现后用 `validate_plugin.py` 验证 manifest 与 Skill，用本任务的 fixture 测试 Hook 行为。
 
 - [ ] **Step 2: 写纯函数失败测试**
 
@@ -510,14 +514,18 @@ def handle_event(event: Mapping[str, object], env: Mapping[str, str]) -> Mapping
 
 测试行为：
 
-1. `default_state()` 返回 `flowz_enabled=True`、`chatgpt_web_assist_enabled=False`、`user_validation_enabled=False`、`plan_state="idle"`；
+1. `default_state()` 返回三个开关、onboarding 状态/排队重试状态，以及 `task_depth`、`plan_phase`、`context_package` 和 `reported_conflict_ids`；
 2. `parse_control_command()` 识别中英文暂停/恢复和两个功能开关，未知文本返回 `None`；
 3. `apply_control()` 只改变对应开关，不丢失其他状态；
 4. 暂停命令写入状态后，下一次普通 prompt 的 context 不包含 FlowZ 路由；
 5. 会话状态文件不包含原始 prompt；
 6. 缺少 `PLUGIN_DATA` 或数据目录不可写时不抛出未处理异常；
 7. `SessionEnd` 清理当前 session，不能清理其他 session；
-8. 未知事件返回空增量，不改变状态。
+8. 未知事件返回空增量，不改变状态；
+9. `Stop` 只接受绝对末尾顶格、唯一且 nonce 匹配的标记，使用后轮换 nonce；
+10. 紧凑包能压平小型列表/映射，能显式清理过期字段，并过滤明显的凭据形态；
+11. 同一任务的冲突记录只能追加，空数组不能清除，下一项实际任务开始时才重置；
+12. 暂停期间的显式 onboarding 重试会排队，并在压缩后保留到恢复时执行。
 
 - [ ] **Step 3: 运行失败测试**
 
@@ -529,7 +537,7 @@ python -m unittest tests.test_hook_state -v
 
 - [ ] **Step 4: 实现状态和显式命令解析**
 
-在 `flowz_hook.py` 中实现上述纯函数。状态目录只从 `PLUGIN_DATA` 环境变量读取；session id 经过安全文件名规范化后作为文件名，状态 JSON 使用固定 `schemaVersion: 1`。禁止写入 prompt、凭据、环境变量值和项目路径列表。
+在 `flowz_hook.py` 中实现上述纯函数。状态目录优先从 Codex 的 `PLUGIN_DATA` 环境变量读取，仅在其缺失或为空时回退到兼容变量 `CLAUDE_PLUGIN_DATA`；session id 经过安全文件名规范化后作为文件名，状态 JSON 使用固定 `schemaVersion: 3`。Hook 不直接把 prompt 或完整 assistant message 写入状态；白名单标记值必须限长，并过滤明显的凭据形态。
 
 命令映射至少包括：
 
@@ -542,23 +550,27 @@ python -m unittest tests.test_hook_state -v
 关闭用户验证建议 / disable user validation suggestions
 ```
 
+英文 `open`/`close` 与 `enable`/`disable` 等价；允许明确命令外层的礼貌前后缀，
+但不得在说明性正文中误触发。
+
 - [ ] **Step 5: 实现事件适配**
 
 按 Step 1 的固定协议实现：
 
 - `SessionStart`：加载或创建默认状态，输出一次紧凑路由 context；
 - `UserPromptSubmit`：只读取当前 prompt 做显式开关匹配，更新状态并输出下一轮适用的 context；不把 prompt 写入文件；
+- `Stop`：从 assistant message 绝对末尾顶格、唯一、带当前轮换 nonce 的单行 FlowZ JSON 标记保存任务层级、Plan 阶段、紧凑任务包、冲突标识和 onboarding 结果；标记不能修改开关或 schema；
 - `SessionEnd`：清理该 session 的状态并输出空 context；
 - 任何异常：输出最小安全 context、返回非阻断结果，并把诊断写到宿主允许的错误流而非项目目录。
 
 - [ ] **Step 6: 写 Hook 配置并做 fixture 测试**
 
-在 `hooks/hooks.json` 中把三个事件映射到同一个 Python 入口。为跨平台使用以下命令字段，均通过宿主注入的插件根目录定位脚本：
+在 `hooks/hooks.json` 中把四个事件映射到同一个 Python 入口。为跨平台使用以下命令字段，均通过宿主注入的插件根目录定位脚本：
 
 ```json
 {
   "type": "command",
-  "command": "python \"${PLUGIN_ROOT}/hooks/flowz_hook.py\"",
+  "command": "python3 \"${PLUGIN_ROOT}/hooks/flowz_hook.py\"",
   "commandWindows": "python \"%PLUGIN_ROOT%\\hooks\\flowz_hook.py\"",
   "timeout": 10
 }
@@ -575,7 +587,7 @@ python -m unittest tests.test_hook_state -v
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${PLUGIN_ROOT}/hooks/flowz_hook.py\"",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/flowz_hook.py\"",
             "commandWindows": "python \"%PLUGIN_ROOT%\\hooks\\flowz_hook.py\"",
             "timeout": 10
           }
@@ -587,9 +599,21 @@ python -m unittest tests.test_hook_state -v
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${PLUGIN_ROOT}/hooks/flowz_hook.py\"",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/flowz_hook.py\"",
             "commandWindows": "python \"%PLUGIN_ROOT%\\hooks\\flowz_hook.py\"",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/flowz_hook.py\"",
+            "commandWindows": "python \"%PLUGIN_ROOT%\\hooks\\flowz_hook.py\"",
+            "timeout": 3
           }
         ]
       }
@@ -599,7 +623,7 @@ python -m unittest tests.test_hook_state -v
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${PLUGIN_ROOT}/hooks/flowz_hook.py\"",
+            "command": "python3 \"${PLUGIN_ROOT}/hooks/flowz_hook.py\"",
             "commandWindows": "python \"%PLUGIN_ROOT%\\hooks\\flowz_hook.py\"",
             "timeout": 3
           }
@@ -610,9 +634,9 @@ python -m unittest tests.test_hook_state -v
 }
 ```
 
-四个 fixture 的 stdin 形状固定为当前 Codex command Hook 输入：SessionStart 至少包含 session_id、cwd、hook_event_name: "SessionStart"、model、permission_mode、source: "startup"；UserPromptSubmit 至少包含 session_id、turn_id、cwd、hook_event_name: "UserPromptSubmit"、model、permission_mode、prompt；SessionEnd 至少包含 session_id、cwd、hook_event_name: "SessionEnd"、reason: "other"。pause.json 的 prompt 使用 "暂停 FlowZ"，resume.json 的 prompt 使用 "恢复 FlowZ"。测试不得把 fixture 中的 prompt 写入状态文件。
+四个 fixture 的 stdin 形状固定为当前 Codex command Hook 输入：SessionStart 至少包含 session_id、cwd、hook_event_name: "SessionStart"、model、permission_mode、source: "startup"；UserPromptSubmit 至少包含 session_id、turn_id、cwd、hook_event_name: "UserPromptSubmit"、model、permission_mode、prompt；SessionEnd 至少包含 session_id、cwd、hook_event_name: "SessionEnd"、reason: "other"。Stop 测试事件包含 `last_assistant_message` 和 `stop_hook_active`。pause.json 的 prompt 使用 "暂停 FlowZ"，resume.json 的 prompt 使用 "恢复 FlowZ"。测试不得把 fixture 中的 prompt 或完整 assistant message 写入状态文件。
 
-用四个 fixture 驱动 `handle_event()`，确认暂停在下一轮生效、恢复只恢复 FlowZ、两个功能开关互相独立、SessionEnd 只清理本会话。另用一个 subprocess 测试确认实际 stdin/stdout JSON 可被当前 Hook schema 接受。
+用 fixture 和 Stop 状态标记驱动 `handle_event()`，确认暂停在下一轮生效、恢复只恢复 FlowZ、两个功能开关互相独立、排队重试可跨压缩恢复、末尾唯一标记与轮换 nonce 生效、过期上下文字段可清理、同一任务的冲突历史不能由空数组误删、明显凭据形态不持久化、SessionEnd 只清理本会话。另用 subprocess 测试确认实际 stdin/stdout JSON 可被当前 Hook schema 接受，覆盖 `SessionStart`、`UserPromptSubmit`、`Stop`、压缩恢复和 `SessionEnd` 的跨进程状态，以及 `CLAUDE_PLUGIN_DATA` 兼容回退；并验证缺少数据目录时使用最小上下文且不重复触发 onboarding、可恢复状态错误退出 `0`、无效 stdin 非零退出。
 
 运行：
 
@@ -728,7 +752,7 @@ git commit -m "docs: migrate main to Codex plugin workflow"
 
 **Files:**
 - Create: `tests/test_end_to_end_contract.py`
-- Modify: `plugins/flowz/references/host-adaptation.md` only when an observed host difference must be recorded
+- Modify: `plugins/flowz/skills/flowz-workflow/references/host-adaptation.md` only when an observed host difference must be recorded
 
 **Interfaces:**
 - Consumes: Tasks 1–6 的全部插件文件、测试和 README。
@@ -794,7 +818,7 @@ git remote -v
 - [ ] **Step 7: 提交最终验证记录**
 
 ```powershell
-git add -- tests/test_end_to_end_contract.py plugins/flowz/references/host-adaptation.md
+git add -- tests/test_end_to_end_contract.py plugins/flowz/skills/flowz-workflow/references/host-adaptation.md
 git commit -m "test: verify FlowZ Codex plugin contract"
 ```
 

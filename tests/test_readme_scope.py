@@ -34,16 +34,21 @@ class ReadmeScopeTests(unittest.TestCase):
             installation,
             r"(?m)^codex plugin marketplace add <REPOSITORY_ROOT>$",
         )
-        self.assertRegex(installation, r"(?m)^codex plugin add flowz@personal$")
+        self.assertRegex(installation, r"(?m)^codex plugin add flowz@flowz-local$")
+        self.assertNotIn("flowz@personal", installation)
         self.assertLess(
             installation.index("codex plugin marketplace add <REPOSITORY_ROOT>"),
-            installation.index("codex plugin add flowz@personal"),
+            installation.index("codex plugin add flowz@flowz-local"),
         )
         self.assertIn("不需要手动编辑", installation)
         self.assertIn("config.toml", installation)
         self.assertIn("AGENTS.md", installation)
         self.assertIn("并指向同一个仓库根目录", installation)
         self.assertNotIn("并指向同一个文件", installation)
+        self.assertRegex(
+            installation,
+            r"查看安装诊断[\s\S]*?不会重试",
+        )
 
     def assert_plan_contract(self, content: str) -> None:
         self.assertRegex(
@@ -75,6 +80,9 @@ class ReadmeScopeTests(unittest.TestCase):
         )
         self.assertRegex(dependencies, r"若该路径失败[\s\S]*?GitHub 仓库和路径回退")
         self.assertIn("不会自动替换为 Fork", dependencies)
+        catalog_link = re.search(r"\]\(([^)]+third-party-skills\.json)\)", dependencies)
+        self.assertIsNotNone(catalog_link)
+        self.assertTrue((README.parent / catalog_link.group(1)).is_file())
 
     def assert_control_and_conflict_contract(self, content: str) -> None:
         collaboration = self.section("## 与已有工作流协作", content)
@@ -88,6 +96,9 @@ class ReadmeScopeTests(unittest.TestCase):
         self.assertIn("恢复 FlowZ", controls)
         self.assertIn("ChatGPT 网页版辅助默认关闭", controls)
         self.assertIn("用户验证建议也默认关闭", controls)
+        self.assertIn("非关键", controls)
+        self.assertIn("环境相关", controls)
+        self.assertIn("浏览器", controls)
 
     def assert_privacy_and_metadata_contract(self, content: str) -> None:
         metadata = self.section("## 图标、作者与本地开发状态", content)
@@ -156,8 +167,8 @@ class ReadmeScopeTests(unittest.TestCase):
                 "reversed installation order",
                 self.assert_installation_contract,
                 self.content.replace(
-                    "codex plugin marketplace add <REPOSITORY_ROOT>\ncodex plugin add flowz@personal",
-                    "codex plugin add flowz@personal\ncodex plugin marketplace add <REPOSITORY_ROOT>",
+                    "codex plugin marketplace add <REPOSITORY_ROOT>\ncodex plugin add flowz@flowz-local",
+                    "codex plugin add flowz@flowz-local\ncodex plugin marketplace add <REPOSITORY_ROOT>",
                     1,
                 ),
             ),

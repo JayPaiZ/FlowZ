@@ -32,8 +32,9 @@ class PluginMetadataTests(unittest.TestCase):
             self.assertTrue(path.startswith("./assets/"))
             self.assertTrue((PLUGIN / path[2:]).is_file(), path)
 
-    def test_manifest_does_not_use_unsupported_top_level_hooks_field(self):
+    def test_default_hook_discovery_needs_no_manifest_override(self):
         self.assertNotIn("hooks", self.manifest)
+        self.assertTrue((PLUGIN / "hooks/hooks.json").is_file())
 
 
 if __name__ == "__main__":
