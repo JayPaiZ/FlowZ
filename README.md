@@ -4,7 +4,14 @@ FlowZ 是一个面向 Codex 的本地插件：它会根据任务的风险、范�
 
 ## 安装与首次启用
 
-本仓库提供的是本地 marketplace，不是公共插件目录。请在 Codex 的插件/marketplace 入口添加本仓库中的 [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json)，然后从名为 `personal` 的本地 marketplace 安装 `flowz`。安装时按宿主提示审核插件的 Skill 和 Hook；安装完成后新开一个 Codex CLI 或桌面版会话，确保插件在会话开始时被加载。
+本仓库提供的是本地 marketplace，不是公共插件目录。Codex 将**仓库根目录**作为 marketplace source，并从其中的 [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json) 发现 manifest。在终端中，将 `<REPOSITORY_ROOT>` 替换为当前 FlowZ 检出的根目录后运行：
+
+```text
+codex plugin marketplace add <REPOSITORY_ROOT>
+codex plugin add flowz@personal
+```
+
+安装时按宿主提示审核插件的 Skill 和 Hook；安装完成后新开一个 Codex CLI 或桌面版会话，确保插件在会话开始时被加载。
 
 不同 Codex CLI 与桌面版的插件界面和能力可能略有差异。若当前界面没有本地 marketplace 入口，请使用该版本提供的插件管理入口，并指向同一个文件；不需要手动编辑 `config.toml` 或项目的 `AGENTS.md`。
 
@@ -18,7 +25,7 @@ FlowZ 始终选择一个最小可行层级：
 | --- | --- | --- |
 | **Quick** | 低风险、小范围、意图清晰 | 直接实施，并由 Agent 自动验证。 |
 | **Standard** | 存在实质不确定性、方案选择或局部边界 | 优先使用宿主 Plan；宿主没有可用 Plan 时，用同字段的结构化契约兜底。仅在行为、数据、权限、架构或外部状态会实质改变时等待批准。 |
-| **Full** | 需要先明确设计、风险、验收与边界 | 优先使用宿主 Plan；先取得设计和范围批准，再在批准边界内连续实施和验证。 |
+| **Full** | 需要先明确设计、风险、验收与边界 | 优先使用宿主 Plan；宿主没有可用 Plan 时，用同字段的结构化契约兜底；先取得设计和范围批准，再在批准边界内连续实施和验证。 |
 
 推理投入属于这套 Plan 策略。FlowZ 可以建议宿主对 Standard 或 Full 任务使用更深入的推理，但不会暗改你的模型、推理设置或本地配置。它只呈现可审阅的假设、证据、取舍和结论，不会索取或展示内部思维过程。
 
