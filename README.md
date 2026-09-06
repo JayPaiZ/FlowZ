@@ -13,7 +13,7 @@ codex plugin add flowz@personal
 
 安装时按宿主提示审核插件的 Skill 和 Hook；安装完成后新开一个 Codex CLI 或桌面版会话，确保插件在会话开始时被加载。
 
-不同 Codex CLI 与桌面版的插件界面和能力可能略有差异。若当前界面没有本地 marketplace 入口，请使用该版本提供的插件管理入口，并指向同一个文件；不需要手动编辑 `config.toml` 或项目的 `AGENTS.md`。
+不同 Codex CLI 与桌面版的插件界面和能力可能略有差异。若当前界面没有本地 marketplace 入口，请使用该版本提供的插件管理入口，并指向同一个仓库根目录；不需要手动编辑 `config.toml` 或项目的 `AGENTS.md`。
 
 第一次处理实际任务时，FlowZ 会检查可选第三方 Skill 是否已可用。安装或检查失败不会阻断 FlowZ 的核心路由；它会说明失败点、受影响能力和下一步。只有你明确要求“重试安装”或“查看安装诊断”时，才会再次尝试。
 

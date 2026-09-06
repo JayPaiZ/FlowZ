@@ -42,6 +42,8 @@ class ReadmeScopeTests(unittest.TestCase):
         self.assertIn("不需要手动编辑", installation)
         self.assertIn("config.toml", installation)
         self.assertIn("AGENTS.md", installation)
+        self.assertIn("并指向同一个仓库根目录", installation)
+        self.assertNotIn("并指向同一个文件", installation)
 
     def assert_plan_contract(self, content: str) -> None:
         self.assertRegex(
