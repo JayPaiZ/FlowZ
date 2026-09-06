@@ -1,4 +1,0 @@
-interface:
-  display_name: "English Humanizer"
-  short_description: "Rewrite English prose while preserving its facts"
-  default_prompt: "Use $humanizer-en to rewrite this English text naturally without changing its facts."
