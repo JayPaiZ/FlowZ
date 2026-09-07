@@ -73,7 +73,7 @@ FlowZ 仅记录以下可选能力，不复制、改名或覆盖它们：
 
 FlowZ 由 [JayPaiZ](https://github.com/JayPaiZ) 维护，使用 MIT 许可证。
 
-主页与仓库：[github.com/JayPaiZ/FlowZ](https://github.com/JayPaiZ/FlowZ)。
+主页与仓库：[github.com/JayPaiZ/FlowZ/tree/FlowZ-Codex](https://github.com/JayPaiZ/FlowZ/tree/FlowZ-Codex)。
 
 当前版本是仓库内的本地 marketplace 开发版：尚未发布到公共目录，也不会自动发布或推送。CLI 与桌面版可见的 Plan、Hook 审核和插件管理能力由各自宿主版本决定；能力不可用时，FlowZ 保留相同的工作流语义并使用结构化契约降级。
 
