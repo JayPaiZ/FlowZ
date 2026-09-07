@@ -4,3 +4,4 @@
 # Local planning and temporary artifact workspaces are not distribution files.
 .superpowers/
 tmp/
+AGENTS.md
