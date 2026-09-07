@@ -4,7 +4,11 @@
 # Local planning and temporary artifact workspaces are not distribution files.
 .superpowers/
 tmp/
+/docs/design/
 
 # Python test and Hook bytecode caches are local-only.
 __pycache__/
 *.py[cod]
+
+# Keep local project instructions available without distributing them.
+/AGENTS.md

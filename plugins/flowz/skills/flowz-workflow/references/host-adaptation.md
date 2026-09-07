@@ -11,6 +11,27 @@ Global plugin enable/disable remains controlled by the host. A running session
 does not promise hot loading or hot unloading; a new chat or CLI session is the
 reliable boundary for a global change.
 
+The same boundary applies after installing or enabling Superpowers. Installation
+does not prove that its Skills are loaded or active in the current session, and
+FlowZ must not claim a hot-loaded integration.
+
+FlowZ itself also treats a new chat or CLI session as the recommended stable
+loading boundary, not a mandatory onboarding step. `SessionStart` reports that
+FlowZ is loaded and shows saved activation state; it never starts installation.
+If the user says "激活 FlowZ 插件" or "activate FlowZ plugin", run the complete
+onboarding once. If they start a normal FlowZ task instead, ask once whether to
+run it now. Deferring keeps core routing active and suppresses another automatic
+offer for this session.
+
+FlowZ does not require fixed Plan commands. When the host Plan is visible, the
+agent chooses and uses it automatically. Any material permission change or
+external action remains subject to host approval.
+
+The agent does not ask the user to select internal routing labels or Plan
+phases. User-facing explanations stay natural: "I'll handle this directly" for
+low-impact work, or "You need to decide this scope/permission change" when a
+real decision is required. The host's approval mechanism remains authoritative.
+
 ## Session switches
 
 The following user controls apply from the next user turn. Treat the quoted
@@ -23,6 +44,8 @@ control command:
 - "open/close ChatGPT web assistance" changes only that independent switch.
 - "open/close user validation suggestions" changes only that independent
   switch.
+- "activate FlowZ plugin" requests one complete onboarding immediately.
+- "defer FlowZ onboarding" postpones it for this session without pausing FlowZ.
 
 If the user requests an onboarding retry while FlowZ is paused, queue that
 one retry and run it only after an explicit resume. Viewing saved diagnostics

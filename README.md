@@ -11,15 +11,17 @@ codex plugin marketplace add <REPOSITORY_ROOT>
 codex plugin add flowz@flowz-local
 ```
 
-安装时按宿主提示审核插件的 Skill 和 Hook；安装完成后新开一个 Codex CLI 或桌面版会话，确保插件在会话开始时被加载。
+安装时按宿主提示审核插件的 Skill 和 Hook。新开一个 Codex CLI 或桌面版会话是最稳定的加载方式，但 FlowZ 不强制新会话。
 
 不同 Codex CLI 与桌面版的插件界面和能力可能略有差异。若当前界面没有本地 marketplace 入口，请使用该版本提供的插件管理入口，并指向同一个仓库根目录；不需要手动编辑 `config.toml` 或项目的 `AGENTS.md`。
 
-第一次处理实际任务时，FlowZ 会检查可选第三方 Skill 是否已可用。安装或检查失败不会阻断 FlowZ 的核心路由；它会说明失败点、受影响能力和下一步。只有你明确要求“重试安装第三方 Skill”时才会再次尝试；“查看安装诊断”只展示已保存的结果，不会重试或重新检查。
+进入会话后，你可直接开始任务，也可以说“激活 FlowZ 插件”，立即运行一次完整 onboarding，检查并准备四项已登记的第三方 Skill。若你直接开始任务，FlowZ 只会在第一次识别到普通 FlowZ 任务时询问一次；选择暂缓不会中断当前任务，核心路由仍可用。
+
+安装或检查失败不会阻断 FlowZ 的核心路由；FlowZ 会记录当前可调用的依赖，并用短诊断说明失败点和受影响能力。只有你明确要求“重试安装第三方 Skill”时才会再次尝试；“查看安装诊断”只展示已保存的结果，不会重试或重新检查。`SessionStart` 只报告加载和激活状态，不会自动安装任何 Skill。
 
 ## FlowZ 如何选择工作深度
 
-FlowZ 始终选择一个最小可行层级：
+FlowZ 会自动选择最小可行层级，不要求用户学习或选择内部深度、Plan 阶段或状态标记：
 
 | 层级 | 适用情况 | Plan 与执行 |
 | --- | --- | --- |
@@ -29,11 +31,13 @@ FlowZ 始终选择一个最小可行层级：
 
 推理投入属于这套 Plan 策略。FlowZ 可以建议宿主对 Standard 或 Full 任务使用更深入的推理，但不会暗改你的模型、推理设置或本地配置。它只呈现可审阅的假设、证据、取舍和结论，不会索取或展示内部思维过程。
 
+低影响、可撤回的本地修改会连续执行。只有范围、数据、权限、架构、外部状态或不可逆操作发生实质变化时，FlowZ 才会简短说明影响并遵守宿主批准。任务结束时，它会用自然语言说明改了什么、验证了什么、剩余风险或未完成项，以及用户是否需要下一步操作；安全和关键回归验证仍由 Agent 负责。
+
 ## 与已有工作流协作
 
 你的系统约束、项目规则、`AGENTS.md`、已启用的 Skill、插件和工作流优先于 FlowZ。遇到冲突时，FlowZ 会跳过冲突的自身行为、保留不冲突部分，并在同一任务中只报告一次冲突来源；它不会修改冲突来源。
 
-FlowZ 不依赖、安装或复制 Superpowers。只有 Superpowers 或其他等价工作流已在当前会话中明确加载并生效时，FlowZ 才会尊重其主导的设计、批准和生命周期，避免启动第二套同类流程。
+Superpowers 是可选工作流集成，不属于 FlowZ onboarding 的四项依赖。安装不等于加载，加载也不等于在当前会话生效；FlowZ 只依据宿主可见的生效状态协作。未加载时，FlowZ 继续完成任务；只在明确有收益的 Standard/Full 任务中给出一次非阻断建议，不自动安装，也不改变 Quick 语义。已加载且在当前会话生效时，相关设计、TDD、调试、评审和交付生命周期交给 Superpowers，FlowZ 不再启动第二套同类流程。用户显式调用某个 Superpowers Skill 时，FlowZ 完整遵守该 Skill。
 
 对于长任务，一旦 Plan 获得批准，FlowZ 会在批准边界内连续执行和自动验证，不会为普通中间进度反复索要确认。出现新证据推翻方案、需要扩大范围、破坏性操作、权限或外部状态变化、环境阻塞，或更高优先级规则要求暂停时，它才会停下重新对齐。
 
@@ -45,6 +49,8 @@ FlowZ 不依赖、安装或复制 Superpowers。只有 Superpowers 或其他等�
 - 说“恢复 FlowZ”或 “resume FlowZ”，重新启用 FlowZ 路由。
 - 说“打开/关闭 ChatGPT 网页版辅助”，只切换该独立功能。
 - 说“打开/关闭用户验证建议”，只切换该独立功能。
+- 说“使用简洁回答”或“使用详细回答”，设置本会话的回答详略偏好。
+- 说“隐藏计划摘要”或“显示简短计划摘要”，设置本会话的计划摘要偏好。
 
 ChatGPT 网页版辅助默认关闭，用户验证建议也默认关闭。打开 ChatGPT 网页版辅助后，FlowZ 只会在独立对话确有价值且宿主具有可见浏览器能力时提出或使用它，并会说明共享内容与结果如何并入当前任务；没有浏览器能力时只提供可复制的提示词，不会声称已经访问网页。
 
@@ -63,9 +69,11 @@ FlowZ 仅记录以下可选能力，不复制、改名或覆盖它们：
 
 规范名或兼容别名已安装即视为满足。缺失时，FlowZ 先使用 Codex 原生 Skill Installer；若该路径失败，才按 [第三方目录](plugins/flowz/skills/flowz-onboarding/references/third-party-skills.json) 中记录的原作者 GitHub 仓库和路径回退。目录分别记录供 Installer 使用的 Skill 目录和供来源定位使用的入口文件，根目录 Skill 不会再把 `SKILL.md` 当作安装目录。它不会自动替换为 Fork、同名替代项目或未记录来源，也不会把中文与英文文本处理 Skill 混用。
 
-## 图标、作者与本地开发状态
+## 作者与本地开发状态
 
-FlowZ 由 [JayPaiZ](https://github.com/JayPaiZ) 维护，使用 MIT 许可证。插件同时提供完整水墨原图 [`logo.png`](plugins/flowz/assets/logo.png) 与透明圆角区域的圆形小图标 [`icon.png`](plugins/flowz/assets/icon.png)，后者面向插件列表和编辑器小尺寸展示。
+FlowZ 由 [JayPaiZ](https://github.com/JayPaiZ) 维护，使用 MIT 许可证。
+
+主页与仓库：[github.com/JayPaiZ/FlowZ](https://github.com/JayPaiZ/FlowZ)。
 
 当前版本是仓库内的本地 marketplace 开发版：尚未发布到公共目录，也不会自动发布或推送。CLI 与桌面版可见的 Plan、Hook 审核和插件管理能力由各自宿主版本决定；能力不可用时，FlowZ 保留相同的工作流语义并使用结构化契约降级。
 

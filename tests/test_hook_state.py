@@ -52,13 +52,19 @@ class HookStateTests(unittest.TestCase):
                 "chatgpt_web_assist_enabled": False,
                 "user_validation_enabled": False,
                 "onboarding_status": "pending",
+                "onboarding_prompted": False,
+                "onboarding_activation_requested": False,
                 "onboarding_diagnostics": [],
+                "available_dependencies": [],
                 "onboarding_retry_pending": False,
                 "marker_nonce": "",
                 "task_depth": "unclassified",
                 "plan_phase": "idle",
                 "context_package": {},
                 "reported_conflict_ids": [],
+                "recommended_optional_workflows": [],
+                "response_detail": "normal",
+                "plan_summary": "brief",
             },
         )
 
@@ -108,6 +114,115 @@ class HookStateTests(unittest.TestCase):
         self.assertFalse(updated["user_validation_enabled"])
         self.assertEqual(updated["plan_phase"], "approved")
 
+    def test_activation_and_defer_commands_are_recognized(self):
+        self.assertEqual(parse_control_command("激活 FlowZ 插件"), "activate_flowz")
+        self.assertEqual(parse_control_command("activate FlowZ plugin"), "activate_flowz")
+        self.assertEqual(parse_control_command("暂缓 onboarding"), "defer_onboarding")
+        self.assertEqual(parse_control_command("暂缓"), "defer_onboarding")
+        self.assertEqual(parse_control_command("defer"), "defer_onboarding")
+        self.assertEqual(parse_control_command("稍后"), "defer_onboarding")
+        self.assertEqual(parse_control_command("later"), "defer_onboarding")
+
+    def test_session_start_reports_loaded_state_without_starting_onboarding(self):
+        with tempfile.TemporaryDirectory() as raw:
+            result = handle_event(
+                {
+                    "hook_event_name": "SessionStart",
+                    "session_id": "session-start-loaded",
+                },
+                {"PLUGIN_DATA": raw},
+            )
+        context = result["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("FlowZ plugin: loaded", context)
+        self.assertIn("onboarding: not activated", context)
+        self.assertNotIn("$flowz-onboarding", context)
+
+    def test_activate_flowz_requests_onboarding_without_starting_a_task(self):
+        state = apply_control(default_state(), "activate_flowz")
+        self.assertEqual(state["onboarding_status"], "pending")
+        self.assertTrue(state["onboarding_activation_requested"])
+        self.assertTrue(state["onboarding_prompted"])
+        self.assertEqual(state["plan_phase"], "idle")
+
+    def test_deferred_onboarding_does_not_block_core_routing(self):
+        state = apply_control(default_state(), "defer_onboarding")
+        self.assertTrue(state["flowz_enabled"])
+        self.assertEqual(state["onboarding_status"], "deferred")
+        self.assertTrue(state["onboarding_prompted"])
+
+    def test_recommended_optional_workflows_are_bounded_and_task_scoped(self):
+        from plugins.flowz.hooks import flowz_hook
+
+        state = flowz_hook._persistable_state(
+            {
+                "recommended_optional_workflows": [
+                    "superpowers:brainstorming",
+                    "superpowers:brainstorming",
+                    "superpowers:" + "x" * 100,
+                    "api_key=should-not-persist",
+                ]
+            }
+        )
+        self.assertEqual(
+            state["recommended_optional_workflows"], ["superpowers:brainstorming"]
+        )
+
+    def test_recommended_optional_workflows_reject_unknown_superpowers_ids(self):
+        from plugins.flowz.hooks import flowz_hook
+
+        state = flowz_hook._persistable_state(
+            {
+                "recommended_optional_workflows": [
+                    "superpowers:totally-unknown",
+                    "superpowers:brainstorming",
+                ]
+            }
+        )
+        self.assertEqual(
+            state["recommended_optional_workflows"], ["superpowers:brainstorming"]
+        )
+
+    def test_stop_marker_appends_recommendations_without_duplicates(self):
+        from plugins.flowz.hooks import flowz_hook
+
+        state = {"recommended_optional_workflows": ["superpowers:brainstorming"]}
+        updated = flowz_hook._apply_state_update(
+            state,
+            {
+                "recommended_optional_workflows": [
+                    "superpowers:brainstorming",
+                    "superpowers:verification-before-completion",
+                ]
+            },
+        )
+        self.assertEqual(
+            updated["recommended_optional_workflows"],
+            [
+                "superpowers:brainstorming",
+                "superpowers:verification-before-completion",
+            ],
+        )
+
+    def test_new_task_clears_previous_recommendations(self):
+        from plugins.flowz.hooks import flowz_hook
+
+        state = flowz_hook._start_task(
+            {"recommended_optional_workflows": ["superpowers:brainstorming"]}
+        )
+        self.assertEqual(state["recommended_optional_workflows"], [])
+
+    def test_render_context_shows_saved_recommendations_only(self):
+        context = render_context(
+            {
+                "recommended_optional_workflows": [
+                    "superpowers:systematic-debugging"
+                ],
+                "context_package": {"evidence": "api_key=hidden"},
+            }
+        )
+        self.assertIn("superpowers:systematic-debugging", context)
+        self.assertNotIn("api_key=", context)
+
     def test_first_real_task_requests_onboarding_once_and_starts_routing(self):
         with tempfile.TemporaryDirectory() as raw:
             env = {"PLUGIN_DATA": raw}
@@ -122,13 +237,286 @@ class HookStateTests(unittest.TestCase):
             first = handle_event(event, env)
             first_context = first["hookSpecificOutput"]["additionalContext"]
             state = load_state(Path(raw), "session-onboarding")
-            self.assertEqual(state["onboarding_status"], "requested")
+            self.assertEqual(state["onboarding_status"], "prompted")
             self.assertEqual(state["plan_phase"], "routing")
-            self.assertIn("$flowz-onboarding", first_context)
+            self.assertIn("是否现在运行一次完整 onboarding", first_context)
 
             second = handle_event(event, env)
             second_context = second["hookSpecificOutput"]["additionalContext"]
-            self.assertNotIn("run $flowz-onboarding once now", second_context)
+            self.assertNotIn("是否现在运行一次完整 onboarding", second_context)
+
+    def test_explicit_activation_has_no_second_onboarding_question(self):
+        with tempfile.TemporaryDirectory() as raw:
+            env = {"PLUGIN_DATA": raw}
+            event = read_fixture("session-start.json")
+            event.update(
+                {
+                    "hook_event_name": "UserPromptSubmit",
+                    "prompt": "激活 FlowZ 插件",
+                    "session_id": "session-activate",
+                }
+            )
+            result = handle_event(event, env)
+            context = result["hookSpecificOutput"]["additionalContext"]
+            state = load_state(Path(raw), "session-activate")
+
+        self.assertIn("$flowz-onboarding", context)
+        self.assertNotIn("是否现在运行一次完整 onboarding", context)
+        self.assertTrue(state["onboarding_activation_requested"])
+
+    def test_accepting_the_first_task_offer_runs_onboarding_once(self):
+        with tempfile.TemporaryDirectory() as raw:
+            env = {"PLUGIN_DATA": raw}
+            event = read_fixture("session-start.json")
+            event.update(
+                {
+                    "hook_event_name": "UserPromptSubmit",
+                    "prompt": "先处理普通任务",
+                    "session_id": "session-accept-offer",
+                }
+            )
+            handle_event(event, env)
+            event["prompt"] = "现在运行完整 onboarding"
+            accepted = handle_event(event, env)
+            accepted_context = accepted["hookSpecificOutput"]["additionalContext"]
+            state = load_state(Path(raw), "session-accept-offer")
+
+        self.assertIn("$flowz-onboarding", accepted_context)
+        self.assertNotIn("是否现在运行一次完整 onboarding", accepted_context)
+        self.assertTrue(state["onboarding_activation_requested"])
+
+    def test_common_acceptance_wrapper_is_scoped_to_prompted_onboarding(self):
+        with tempfile.TemporaryDirectory() as raw:
+            env = {"PLUGIN_DATA": raw}
+            event = read_fixture("session-start.json")
+            event.update(
+                {
+                    "hook_event_name": "UserPromptSubmit",
+                    "prompt": "先做普通任务",
+                    "session_id": "session-accept-wrapper",
+                }
+            )
+            handle_event(event, env)
+            event["prompt"] = "yes, please"
+            result = handle_event(event, env)
+        self.assertIn("$flowz-onboarding", result["hookSpecificOutput"]["additionalContext"])
+
+    def test_short_acceptance_reply_is_scoped_to_prompted_onboarding(self):
+        with tempfile.TemporaryDirectory() as raw:
+            env = {"PLUGIN_DATA": raw}
+            event = read_fixture("session-start.json")
+            event.update(
+                {
+                    "hook_event_name": "UserPromptSubmit",
+                    "prompt": "开始普通任务",
+                    "session_id": "session-accept-short",
+                }
+            )
+            handle_event(event, env)
+            event["prompt"] = "sure"
+            result = handle_event(event, env)
+        self.assertIn("$flowz-onboarding", result["hookSpecificOutput"]["additionalContext"])
+
+    def test_explicit_defer_keeps_workflow_context_without_reprompting(self):
+        with tempfile.TemporaryDirectory() as raw:
+            env = {"PLUGIN_DATA": raw}
+            event = read_fixture("session-start.json")
+            event.update(
+                {
+                    "hook_event_name": "UserPromptSubmit",
+                    "prompt": "暂缓 onboarding",
+                    "session_id": "session-defer",
+                }
+            )
+            first = handle_event(event, env)
+            event["prompt"] = "继续我的 FlowZ 任务"
+            second = handle_event(event, env)
+
+        self.assertIn("$flowz-workflow", first["hookSpecificOutput"]["additionalContext"])
+        self.assertIn("$flowz-workflow", second["hookSpecificOutput"]["additionalContext"])
+        self.assertNotIn("是否现在运行一次完整 onboarding", second["hookSpecificOutput"]["additionalContext"])
+
+    def test_available_dependencies_are_bounded_and_marker_persisted(self):
+        dependencies = [
+            {"name": "humanizer-zh", "status": "checked", "aliases": []},
+            {"name": "humanizer", "status": "checked", "aliases": ["humanizer-en"]},
+            {"name": "grilling", "status": "degraded", "aliases": [], "diagnostic": "network unavailable"},
+            {"name": "gstack-openclaw-office-hours", "status": "checked", "aliases": ["office-hours"]},
+            {"name": "unknown", "status": "checked", "aliases": []},
+        ]
+        with tempfile.TemporaryDirectory() as raw:
+            data_root = Path(raw)
+            marker = authenticated_marker(
+                data_root,
+                "session-dependencies",
+                {"onboarding_status": "degraded", "available_dependencies": dependencies},
+            )
+            handle_event(
+                {
+                    "hook_event_name": "Stop",
+                    "session_id": "session-dependencies",
+                    "last_assistant_message": marker,
+                },
+                {"PLUGIN_DATA": raw},
+            )
+            state = load_state(data_root, "session-dependencies")
+
+        self.assertEqual(len(state["available_dependencies"]), 4)
+        self.assertNotIn("unknown", str(state["available_dependencies"]))
+        self.assertEqual(state["onboarding_status"], "degraded")
+
+    def test_onboarding_marker_cannot_downgrade_checked_or_deferred_state(self):
+        from plugins.flowz.hooks import flowz_hook
+
+        checked = flowz_hook._apply_state_update(
+            {
+                **default_state(),
+                "onboarding_status": "checked",
+                "available_dependencies": [
+                    {"name": "humanizer-zh", "status": "checked", "satisfied_by": "humanizer-zh"},
+                    {"name": "humanizer", "status": "checked", "satisfied_by": "humanizer-en"},
+                    {"name": "grilling", "status": "checked", "satisfied_by": "grilling"},
+                    {"name": "gstack-openclaw-office-hours", "status": "checked", "satisfied_by": "office-hours"},
+                ],
+            },
+            {"onboarding_status": "prompted"},
+        )
+        deferred = flowz_hook._apply_state_update(
+            {**default_state(), "onboarding_status": "deferred"},
+            {"onboarding_status": "prompted"},
+        )
+        self.assertEqual(checked["onboarding_status"], "checked")
+        self.assertEqual(deferred["onboarding_status"], "deferred")
+
+    def test_checked_onboarding_requires_all_catalog_dependencies_with_evidence(self):
+        from plugins.flowz.hooks import flowz_hook
+
+        incomplete = flowz_hook._apply_state_update(
+            default_state(),
+            {
+                "onboarding_status": "checked",
+                "available_dependencies": [
+                    {
+                        "name": "humanizer-zh",
+                        "status": "checked",
+                        "satisfied_by": "humanizer-zh",
+                    }
+                ],
+            },
+        )
+        complete = flowz_hook._apply_state_update(
+            default_state(),
+            {
+                "onboarding_status": "checked",
+                "available_dependencies": [
+                    {
+                        "name": "humanizer-zh",
+                        "status": "checked",
+                        "satisfied_by": "humanizer-zh",
+                    },
+                    {
+                        "name": "humanizer",
+                        "status": "checked",
+                        "satisfied_by": "humanizer-en",
+                    },
+                    {
+                        "name": "grilling",
+                        "status": "checked",
+                        "satisfied_by": "grilling",
+                    },
+                    {
+                        "name": "gstack-openclaw-office-hours",
+                        "status": "checked",
+                        "satisfied_by": "office-hours",
+                    },
+                ],
+            },
+        )
+        self.assertEqual(incomplete["onboarding_status"], "degraded")
+        self.assertTrue(incomplete["onboarding_diagnostics"])
+        self.assertEqual(complete["onboarding_status"], "checked")
+
+    def test_persisted_checked_state_without_dependency_evidence_degrades(self):
+        from plugins.flowz.hooks import flowz_hook
+
+        state = flowz_hook._persistable_state(
+            {"onboarding_status": "checked", "available_dependencies": []}
+        )
+        self.assertEqual(state["onboarding_status"], "degraded")
+        self.assertTrue(state["onboarding_diagnostics"])
+
+    def test_completed_or_deferred_onboarding_clears_stale_activation_flags(self):
+        from plugins.flowz.hooks import flowz_hook
+
+        complete = flowz_hook._persistable_state(
+            {
+                "onboarding_status": "checked",
+                "available_dependencies": [
+                    {"name": "humanizer-zh", "status": "checked", "satisfied_by": "humanizer-zh"},
+                    {"name": "humanizer", "status": "checked", "satisfied_by": "humanizer-en"},
+                    {"name": "grilling", "status": "checked", "satisfied_by": "grilling"},
+                    {"name": "gstack-openclaw-office-hours", "status": "checked", "satisfied_by": "office-hours"},
+                ],
+                "onboarding_activation_requested": True,
+                "onboarding_retry_pending": True,
+            }
+        )
+        deferred = flowz_hook._persistable_state(
+            {
+                "onboarding_status": "deferred",
+                "onboarding_activation_requested": True,
+                "onboarding_retry_pending": True,
+            }
+        )
+        self.assertFalse(complete["onboarding_activation_requested"])
+        self.assertFalse(complete["onboarding_retry_pending"])
+        self.assertFalse(deferred["onboarding_activation_requested"])
+        self.assertFalse(deferred["onboarding_retry_pending"])
+
+    def test_preferences_are_whitelisted_and_do_not_store_unrelated_fields(self):
+        from plugins.flowz.hooks import flowz_hook
+
+        state = flowz_hook._persistable_state(
+            {
+                "response_detail": "detailed",
+                "plan_summary": "hidden",
+                "model": "private-model",
+                "raw_prompt": "do not save",
+            }
+        )
+        self.assertEqual(state["response_detail"], "detailed")
+        self.assertEqual(state["plan_summary"], "hidden")
+        self.assertNotIn("model", state)
+        self.assertNotIn("raw_prompt", state)
+
+    def test_marker_preferences_do_not_change_safety_switches(self):
+        with tempfile.TemporaryDirectory() as raw:
+            data_root = Path(raw)
+            save_state(data_root, "session-preferences", default_state())
+            marker = authenticated_marker(
+                data_root,
+                "session-preferences",
+                {
+                    "response_detail": "concise",
+                    "plan_summary": "hidden",
+                    "flowz_enabled": False,
+                    "user_validation_enabled": True,
+                },
+            )
+            handle_event(
+                {
+                    "hook_event_name": "Stop",
+                    "session_id": "session-preferences",
+                    "last_assistant_message": marker,
+                },
+                {"PLUGIN_DATA": raw},
+            )
+            state = load_state(data_root, "session-preferences")
+
+        self.assertEqual(state["response_detail"], "concise")
+        self.assertEqual(state["plan_summary"], "hidden")
+        self.assertTrue(state["flowz_enabled"])
+        self.assertFalse(state["user_validation_enabled"])
 
     def test_control_commands_do_not_consume_first_task_onboarding(self):
         with tempfile.TemporaryDirectory() as raw:
@@ -974,6 +1362,12 @@ class HookStateTests(unittest.TestCase):
             state = {
                 **default_state(),
                 "onboarding_status": "checked",
+                "available_dependencies": [
+                    {"name": "humanizer-zh", "status": "checked", "satisfied_by": "humanizer-zh"},
+                    {"name": "humanizer", "status": "checked", "satisfied_by": "humanizer-en"},
+                    {"name": "grilling", "status": "checked", "satisfied_by": "grilling"},
+                    {"name": "gstack-openclaw-office-hours", "status": "checked", "satisfied_by": "office-hours"},
+                ],
                 "task_depth": "Full",
                 "plan_phase": "executing",
                 "context_package": {"goal": "Recover after compaction"},
@@ -1170,7 +1564,11 @@ class HookStateTests(unittest.TestCase):
             )
             prompt_result = run_event(prompt)
             self.assertIn(
-                "$flowz-onboarding",
+                "是否现在运行一次完整 onboarding",
+                prompt_result["hookSpecificOutput"]["additionalContext"],
+            )
+            self.assertNotIn(
+                "run $flowz-onboarding once now",
                 prompt_result["hookSpecificOutput"]["additionalContext"],
             )
             before_stop = load_state(data_root, session_id)

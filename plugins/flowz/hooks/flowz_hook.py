@@ -36,7 +36,41 @@ _PLAN_PHASES = {
     "complete",
     "blocked",
 }
-_ONBOARDING_STATUSES = {"pending", "requested", "checked", "degraded"}
+_ONBOARDING_STATUSES = {
+    "pending",
+    "prompted",
+    "deferred",
+    "requested",
+    "checked",
+    "degraded",
+}
+_SUPERPOWERS_WORKFLOW_ID = re.compile(
+    r"^superpowers:[a-z0-9](?:[a-z0-9-]{0,66}[a-z0-9])?$"
+)
+_SUPPORTED_SUPERPOWERS_WORKFLOW_IDS = {
+    "superpowers:brainstorming",
+    "superpowers:systematic-debugging",
+    "superpowers:test-driven-development",
+    "superpowers:verification-before-completion",
+    "superpowers:dispatching-parallel-agents",
+    "superpowers:subagent-driven-development",
+}
+_DEPENDENCY_NAMES = {
+    "humanizer-zh",
+    "humanizer",
+    "grilling",
+    "gstack-openclaw-office-hours",
+}
+_DEPENDENCY_ALIASES = {
+    "humanizer-zh": set(),
+    "humanizer": {"humanizer-en"},
+    "grilling": set(),
+    "gstack-openclaw-office-hours": {"office-hours"},
+}
+_PREFERENCE_VALUES = {
+    "response_detail": {"concise", "normal", "detailed"},
+    "plan_summary": {"hidden", "brief"},
+}
 _STATE_MARKER = re.compile(
     r"(?m)^<!--[ \t]*flowz-state:[ \t]*(\{[^\r\n]*\})[ \t]*-->[ \t]*(?:\r?\n|$)"
 )
@@ -67,6 +101,44 @@ _CONTROL_COMMANDS = {
     "retry third-party skill installation": "retry_onboarding",
     "查看安装诊断": "show_onboarding_diagnostics",
     "show installation diagnostics": "show_onboarding_diagnostics",
+    "激活 flowz 插件": "activate_flowz",
+    "激活 flowz": "activate_flowz",
+    "activate flowz plugin": "activate_flowz",
+    "activate flowz": "activate_flowz",
+    "暂缓 flowz onboarding": "defer_onboarding",
+    "defer flowz onboarding": "defer_onboarding",
+    "暂缓 onboarding": "defer_onboarding",
+    "defer onboarding": "defer_onboarding",
+    "暂缓": "defer_onboarding",
+    "defer": "defer_onboarding",
+    "稍后": "defer_onboarding",
+    "later": "defer_onboarding",
+    "使用简洁回答": "set_response_detail_concise",
+    "use concise responses": "set_response_detail_concise",
+    "使用详细回答": "set_response_detail_detailed",
+    "use detailed responses": "set_response_detail_detailed",
+    "显示简短计划摘要": "set_plan_summary_brief",
+    "show brief plan summaries": "set_plan_summary_brief",
+    "隐藏计划摘要": "set_plan_summary_hidden",
+    "hide plan summaries": "set_plan_summary_hidden",
+}
+_ONBOARDING_ACCEPTANCE_COMMANDS = {
+    "现在运行完整 onboarding",
+    "运行完整 onboarding",
+    "同意 onboarding",
+    "run complete onboarding now",
+    "run full onboarding now",
+    "yes, run onboarding",
+    "yes, please",
+    "yes",
+    "sure",
+    "okay",
+    "ok",
+    "好的",
+    "好",
+    "可以",
+    "同意",
+    "现在执行",
 }
 
 
@@ -77,8 +149,14 @@ def default_state() -> dict[str, object]:
         "chatgpt_web_assist_enabled": False,
         "user_validation_enabled": False,
         "onboarding_status": "pending",
+        "onboarding_prompted": False,
+        "onboarding_activation_requested": False,
         "onboarding_diagnostics": [],
+        "available_dependencies": [],
         "onboarding_retry_pending": False,
+        "recommended_optional_workflows": [],
+        "response_detail": "normal",
+        "plan_summary": "brief",
         "marker_nonce": "",
         "task_depth": "unclassified",
         "plan_phase": "idle",
@@ -116,6 +194,12 @@ def parse_control_command(prompt: str) -> str | None:
     return _CONTROL_COMMANDS.get(normalized)
 
 
+def _accepts_onboarding_offer(prompt: object) -> bool:
+    if not isinstance(prompt, str):
+        return False
+    return prompt.strip().casefold().strip(" ,，。.!！") in _ONBOARDING_ACCEPTANCE_COMMANDS
+
+
 def apply_control(state: Mapping[str, object], action: str) -> dict[str, object]:
     updated = _persistable_state(state)
     if action == "pause_flowz":
@@ -133,6 +217,24 @@ def apply_control(state: Mapping[str, object], action: str) -> dict[str, object]
     elif action == "retry_onboarding":
         updated["onboarding_status"] = "requested"
         updated["onboarding_retry_pending"] = True
+    elif action == "activate_flowz":
+        updated["onboarding_status"] = "pending"
+        updated["onboarding_prompted"] = True
+        updated["onboarding_activation_requested"] = True
+        updated["onboarding_retry_pending"] = False
+    elif action == "defer_onboarding":
+        updated["onboarding_status"] = "deferred"
+        updated["onboarding_prompted"] = True
+        updated["onboarding_activation_requested"] = False
+        updated["onboarding_retry_pending"] = False
+    elif action == "set_response_detail_concise":
+        updated["response_detail"] = "concise"
+    elif action == "set_response_detail_detailed":
+        updated["response_detail"] = "detailed"
+    elif action == "set_plan_summary_brief":
+        updated["plan_summary"] = "brief"
+    elif action == "set_plan_summary_hidden":
+        updated["plan_summary"] = "hidden"
     return updated
 
 
@@ -244,6 +346,87 @@ def _normalize_string_list(
     return result
 
 
+def _normalize_workflow_ids(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    result: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            continue
+        text = " ".join(item.split())
+        if (
+            text
+            and len(text) <= 80
+            and _SUPERPOWERS_WORKFLOW_ID.fullmatch(text)
+            and text in _SUPPORTED_SUPERPOWERS_WORKFLOW_IDS
+            and not _looks_sensitive(text)
+            and text not in result
+        ):
+            result.append(text)
+        if len(result) >= 8:
+            break
+    return result
+
+
+def _normalize_available_dependencies(value: object) -> list[dict[str, object]]:
+    if not isinstance(value, list):
+        return []
+    result: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for item in value:
+        if not isinstance(item, Mapping):
+            continue
+        name = _bounded_text(item.get("name") or item.get("canonical"), 80)
+        status = item.get("status")
+        if name not in _DEPENDENCY_NAMES or name in seen:
+            continue
+        if status not in {"checked", "degraded"}:
+            continue
+        aliases = _normalize_string_list(
+            item.get("aliases"), item_limit=40, count_limit=4
+        )
+        aliases = [
+            alias
+            for alias in aliases
+            if alias in _DEPENDENCY_ALIASES[name]
+        ]
+        satisfied_by = _bounded_text(item.get("satisfied_by"), 80)
+        diagnostic = _bounded_text(item.get("diagnostic"), 180)
+        entry: dict[str, object] = {
+            "name": name,
+            "status": status,
+            "aliases": aliases,
+        }
+        if satisfied_by in ({name} | _DEPENDENCY_ALIASES[name]):
+            entry["satisfied_by"] = satisfied_by
+        if diagnostic and not _looks_sensitive(diagnostic):
+            entry["diagnostic"] = diagnostic
+        result.append(entry)
+        seen.add(name)
+        if len(result) >= 4:
+            break
+    return result
+
+
+def _dependencies_are_fully_checked(value: object) -> bool:
+    if not isinstance(value, list) or len(value) != len(_DEPENDENCY_NAMES):
+        return False
+    seen: set[str] = set()
+    for item in value:
+        if not isinstance(item, Mapping):
+            return False
+        name = item.get("name")
+        if name not in _DEPENDENCY_NAMES or name in seen:
+            return False
+        if item.get("status") != "checked":
+            return False
+        satisfied_by = item.get("satisfied_by")
+        if satisfied_by not in ({name} | _DEPENDENCY_ALIASES[name]):
+            return False
+        seen.add(name)
+    return seen == _DEPENDENCY_NAMES
+
+
 def _normalize_conflict_ids(value: object) -> list[str]:
     """Normalize stable conflict identifiers for case/spacing de-duplication."""
     if not isinstance(value, list):
@@ -301,6 +484,8 @@ def _persistable_state(state: Mapping[str, object]) -> dict[str, object]:
         "chatgpt_web_assist_enabled",
         "user_validation_enabled",
         "onboarding_retry_pending",
+        "onboarding_prompted",
+        "onboarding_activation_requested",
     ):
         if isinstance(state.get(key), bool):
             defaults[key] = state[key]
@@ -310,6 +495,33 @@ def _persistable_state(state: Mapping[str, object]) -> dict[str, object]:
         defaults["onboarding_status"] = onboarding_status
     defaults["onboarding_diagnostics"] = _normalize_string_list(
         state.get("onboarding_diagnostics"), item_limit=300, count_limit=8
+    )
+    defaults["available_dependencies"] = _normalize_available_dependencies(
+        state.get("available_dependencies")
+    )
+    if (
+        defaults["onboarding_status"] == "checked"
+        and not _dependencies_are_fully_checked(defaults["available_dependencies"])
+    ):
+        defaults["onboarding_status"] = "degraded"
+        defaults["onboarding_activation_requested"] = False
+        defaults["onboarding_retry_pending"] = False
+        defaults["onboarding_diagnostics"] = _normalize_string_list(
+            [
+                *defaults["onboarding_diagnostics"],
+                "onboarding check incomplete: dependency evidence is missing",
+            ],
+            item_limit=300,
+            count_limit=8,
+        )
+    if defaults["onboarding_status"] in {"checked", "degraded", "deferred"}:
+        defaults["onboarding_activation_requested"] = False
+        defaults["onboarding_retry_pending"] = False
+    for key, allowed in _PREFERENCE_VALUES.items():
+        if state.get(key) in allowed:
+            defaults[key] = state[key]
+    defaults["recommended_optional_workflows"] = _normalize_workflow_ids(
+        state.get("recommended_optional_workflows")
     )
     marker_nonce = state.get("marker_nonce")
     if isinstance(marker_nonce, str) and re.fullmatch(r"[0-9a-f]{32}", marker_nonce):
@@ -384,6 +596,7 @@ def _start_task(state: Mapping[str, object]) -> dict[str, object]:
     updated["plan_phase"] = "routing"
     updated["context_package"] = {}
     updated["reported_conflict_ids"] = []
+    updated["recommended_optional_workflows"] = []
     return updated
 
 
@@ -504,13 +717,61 @@ def _apply_state_update(
                     [*merged["reported_conflict_ids"], *new_conflicts]
                 )
 
+    if "recommended_optional_workflows" in update and isinstance(
+        update["recommended_optional_workflows"], list
+    ):
+        new_workflows = _normalize_workflow_ids(
+            update["recommended_optional_workflows"]
+        )
+        if new_workflows:
+            merged["recommended_optional_workflows"] = _normalize_workflow_ids(
+                [*merged["recommended_optional_workflows"], *new_workflows]
+            )
+
     onboarding_status = update.get("onboarding_status")
-    if onboarding_status in {"checked", "degraded"}:
+    current_onboarding_status = merged["onboarding_status"]
+    allowed_onboarding_transitions = {
+        "pending": {"prompted", "deferred", "requested", "checked", "degraded"},
+        "prompted": {"prompted", "deferred", "requested", "checked", "degraded"},
+        "deferred": {"deferred", "requested", "checked", "degraded"},
+        "requested": {"requested", "checked", "degraded"},
+        "checked": {"checked", "degraded"},
+        "degraded": {"degraded", "checked"},
+    }
+    if onboarding_status in allowed_onboarding_transitions.get(
+        current_onboarding_status, set()
+    ):
         merged["onboarding_status"] = onboarding_status
-        merged["onboarding_retry_pending"] = False
+        merged["onboarding_prompted"] = onboarding_status in {
+            "prompted", "deferred", "checked", "degraded"
+        }
+        if onboarding_status in {"checked", "degraded", "deferred"}:
+            merged["onboarding_activation_requested"] = False
+            merged["onboarding_retry_pending"] = False
     if isinstance(update.get("onboarding_diagnostics"), list):
         merged["onboarding_diagnostics"] = _normalize_string_list(
             update["onboarding_diagnostics"], item_limit=300, count_limit=8
+        )
+    if isinstance(update.get("available_dependencies"), list):
+        merged["available_dependencies"] = _normalize_available_dependencies(
+            update["available_dependencies"]
+        )
+    for key, allowed in _PREFERENCE_VALUES.items():
+        if update.get(key) in allowed:
+            merged[key] = update[key]
+    if onboarding_status == "checked" and not _dependencies_are_fully_checked(
+        merged["available_dependencies"]
+    ):
+        merged["onboarding_status"] = "degraded"
+        merged["onboarding_activation_requested"] = False
+        merged["onboarding_retry_pending"] = False
+        merged["onboarding_diagnostics"] = _normalize_string_list(
+            [
+                *merged["onboarding_diagnostics"],
+                "onboarding check incomplete: dependency evidence is missing",
+            ],
+            item_limit=300,
+            count_limit=8,
         )
     return _persistable_state(merged)
 
@@ -537,11 +798,14 @@ def render_context(
     web = "on" if current["chatgpt_web_assist_enabled"] else "off"
     validation = "on" if current["user_validation_enabled"] else "off"
     parts = [
+        "FlowZ plugin: loaded",
         "FlowZ routing: enabled",
         f"ChatGPT web assistance: {web}",
         f"user validation suggestions: {validation}",
         f"task depth: {current['task_depth']}",
         f"Plan phase: {current['plan_phase']}",
+        f"response detail: {current['response_detail']}",
+        f"plan summary: {current['plan_summary']}",
     ]
 
     package = current["context_package"]
@@ -553,19 +817,44 @@ def render_context(
     conflicts = current["reported_conflict_ids"]
     if conflicts:
         parts.append("already reported conflicts: " + ", ".join(conflicts))
+    recommendations = current["recommended_optional_workflows"]
+    if recommendations:
+        parts.append(
+            "optional workflow recommendations: " + ", ".join(recommendations)
+        )
 
     status = current["onboarding_status"]
-    if onboarding_action == "initial":
+    if onboarding_action == "prompt":
         parts.append(
-            "onboarding: run $flowz-onboarding once now for this first real task"
+            "onboarding: ask once whether the user wants to run a complete "
+            "onboarding now (是否现在运行一次完整 onboarding); do not install "
+            "until the user agrees; after agreement, run $flowz-onboarding once "
+            "and continue the original task"
+        )
+    elif onboarding_action == "activate":
+        parts.append(
+            "onboarding: explicit activation; run $flowz-onboarding once now, "
+            "then continue the original task"
         )
     elif onboarding_action == "retry":
         parts.append(
             "onboarding: the user explicitly requested one retry; run "
             "$flowz-onboarding once now"
         )
+    elif current["onboarding_activation_requested"]:
+        parts.append(
+            "onboarding: explicit activation requested; run $flowz-onboarding "
+            "once now, then continue the original task"
+        )
     elif status == "pending":
-        parts.append("onboarding: pending until the first real task")
+        parts.append("onboarding: not activated; wait for the first real FlowZ task")
+    elif status == "prompted":
+        parts.append("onboarding: already prompted once; do not ask again automatically")
+    elif status == "deferred":
+        parts.append(
+            "onboarding: deferred for this session; core FlowZ routing continues; "
+            "the user may explicitly activate later"
+        )
     elif status == "requested":
         parts.append(
             "onboarding: initial check already requested; do not run it again automatically"
@@ -574,6 +863,19 @@ def render_context(
         parts.append("onboarding: checked")
     else:
         parts.append(f"onboarding: degraded ({len(diagnostics)} saved diagnostic(s))")
+
+    available = current["available_dependencies"]
+    if available:
+        labels = []
+        for item in available:
+            label = f"{item['name']}={item['status']}"
+            if item.get("satisfied_by"):
+                label += f"({item['satisfied_by']})"
+            if item.get("diagnostic"):
+                label += f"[{item['diagnostic']}]"
+            labels.append(label)
+        summary = ", ".join(labels)
+        parts.append("available dependencies: " + summary)
 
     if show_diagnostics:
         shown = "; ".join(diagnostics) if diagnostics else "none saved"
@@ -651,7 +953,14 @@ def handle_event(event: Mapping[str, object], env: Mapping[str, str]) -> Mapping
         onboarding_action = None
         show_diagnostics = False
         if event_name == "UserPromptSubmit":
-            action = parse_control_command(event.get("prompt", ""))
+            prompt = event.get("prompt", "")
+            action = parse_control_command(prompt)
+            if (
+                action is None
+                and state["onboarding_status"] == "prompted"
+                and _accepts_onboarding_offer(prompt)
+            ):
+                action = "activate_flowz"
             if action:
                 state = apply_control(state, action)
                 if action == "retry_onboarding":
@@ -665,12 +974,22 @@ def handle_event(event: Mapping[str, object], env: Mapping[str, str]) -> Mapping
                     onboarding_action = "retry"
                 elif action == "show_onboarding_diagnostics":
                     show_diagnostics = True
+                elif action == "activate_flowz":
+                    if state["flowz_enabled"]:
+                        onboarding_action = "activate"
+                    else:
+                        state["onboarding_retry_pending"] = True
+                        onboarding_action = "queued"
             elif state["flowz_enabled"]:
                 if state["plan_phase"] in {"idle", "complete"}:
                     state = _start_task(state)
-                if state["onboarding_status"] == "pending":
-                    state["onboarding_status"] = "requested"
-                    onboarding_action = "initial"
+                if (
+                    state["onboarding_status"] == "pending"
+                    and not state["onboarding_prompted"]
+                ):
+                    state["onboarding_status"] = "prompted"
+                    state["onboarding_prompted"] = True
+                    onboarding_action = "prompt"
 
         save_state(data_root, session_id, state)
         if _STATE_ERROR:

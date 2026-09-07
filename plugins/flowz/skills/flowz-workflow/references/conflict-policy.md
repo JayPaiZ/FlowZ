@@ -5,7 +5,10 @@
 Inspect applicable `AGENTS.md`, existing Skills, plugins, and workflows before
 using FlowZ guidance. User instructions and those established project sources
 take priority over this skill. Superpowers is considered only when visibly
-loaded and active; it is not a dependency.
+loaded and active; it is not a dependency. An active Superpowers Skill takes
+lifecycle priority for matching design, TDD, debugging, review, or delivery
+work, so FlowZ skips the overlapping process and retains only non-conflicting
+context and safety rules.
 
 ## Handling a conflict
 

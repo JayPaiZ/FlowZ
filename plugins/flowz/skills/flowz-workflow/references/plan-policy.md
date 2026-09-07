@@ -1,5 +1,10 @@
 # Plan Policy
 
+Quick, Standard, and Full are internal routing labels. Choose them automatically;
+the user does not need to choose a depth or a Plan phase, and labels such as
+`routing` or `awaiting_approval` are not user commands.
+These internal labels stay out of user-facing commands and explanations.
+
 ## Route
 
 Use exactly one of the three task depths:
@@ -44,3 +49,17 @@ Approval authorizes continuous work only inside the stated boundary. Pause when
 new evidence overturns the plan, scope expands, a destructive or permissioned
 operation is needed, an external state change is required, the environment is
 blocked, or a higher-priority rule requires a pause.
+
+For low-impact local and reversible edits, continue without an extra permission
+preface. For behavior, data, permission, architecture, external-state, or
+irreversible changes, briefly state the action, impact, reversibility, and host
+approval needed. One approval boundary covers its ordinary intermediate steps;
+do not ask repeatedly.
+
+## Completion summary
+
+Use a concise natural-language completion summary containing what changed, what
+was verified, remaining risk or unfinished work, and the next user step. An
+unfinished task must not be described as complete. Agent-owned safety, data
+integrity, and critical regression checks remain required even when optional
+user validation suggestions are disabled.

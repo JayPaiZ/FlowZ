@@ -35,10 +35,20 @@ class OnboardingSkillTests(unittest.TestCase):
         self.assertIn("sourceEntry", self.contents)
 
     def test_first_task_and_fallback_order_are_explicit(self):
-        self.assertIn("first real task", self.contents)
+        self.assertIn("first real FlowZ task", self.contents)
+        self.assertIn("activate FlowZ plugin", self.contents)
+        self.assertIn("defer", self.contents)
         native = self.contents.index("native Codex Skill Installer first")
         github = self.contents.index("fall back to GitHub")
         self.assertLess(native, github)
+
+    def test_onboarding_is_not_superpowers_or_a_core_blocker(self):
+        normalized = " ".join(self.contents.split())
+        self.assertIn("Superpowers", self.contents)
+        self.assertIn("not part of the four", normalized)
+        self.assertIn("must not block `flowz-workflow`", normalized)
+        self.assertIn("does not block core FlowZ", normalized)
+        self.assertNotIn("install Superpowers", normalized)
 
     def test_fallback_stays_with_original_source(self):
         normalized = " ".join(self.contents.split())

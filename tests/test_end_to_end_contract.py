@@ -96,16 +96,35 @@ class EndToEndContractTests(unittest.TestCase):
         )
         self.assertEqual(remaining_files, [])
 
-    def test_design_and_implementation_records_match_the_approved_runtime(self):
-        design = (
-            ROOT / "docs/design/2026-09-05-flowz-codex-plugin-design.md"
+    def test_runtime_contract_does_not_depend_on_design_records(self):
+        workflow = PLUGIN / "skills/flowz-workflow"
+        workflow_text = (workflow / "SKILL.md").read_text(encoding="utf-8")
+        onboarding_text = (
+            PLUGIN / "skills/flowz-onboarding/SKILL.md"
         ).read_text(encoding="utf-8")
-        implementation = (
-            ROOT / "docs/design/2026-09-05-flowz-codex-plugin-implementation-plan.md"
-        ).read_text(encoding="utf-8")
-        self.assertIn("状态：APPROVED", design)
-        self.assertNotIn("状态：DRAFT", design)
-        self.assertNotIn("REQUIRED SUB-SKILL", implementation)
+        runtime = (workflow / "references/runtime-state.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertTrue((workflow / "references/superpowers-integration.md").is_file())
+        self.assertIn("Superpowers is not a FlowZ dependency", workflow_text)
+        self.assertIn("four catalog dependencies", onboarding_text)
+        self.assertIn("recommended_optional_workflows", runtime)
+        self.assertIn("available_dependencies", runtime)
+        self.assertFalse((ROOT / "docs" / "design").exists())
+        ignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+        self.assertIn("/docs/design/", ignore)
+        self.assertIn("/AGENTS.md", ignore)
+
+    def test_hook_contract_keeps_task_scoped_recommendations_and_onboarding_separate(self):
+        hook = (PLUGIN / "hooks/flowz_hook.py").read_text(encoding="utf-8")
+        self.assertIn("recommended_optional_workflows", hook)
+        self.assertIn("available_dependencies", hook)
+        self.assertIn("_start_task", hook)
+        self.assertIn("activate_flowz", hook)
+        self.assertIn("defer_onboarding", hook)
+        self.assertIn("response_detail", hook)
+        self.assertIn("plan_summary", hook)
+        self.assertNotIn("codex plugin add", hook)
 
 
 if __name__ == "__main__":

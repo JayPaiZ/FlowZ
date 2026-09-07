@@ -85,6 +85,80 @@ class WorkflowSkillTests(unittest.TestCase):
         self.assertNotIn("superpowers:brainstorming", self.contents)
         self.assertNotIn("/deep-planning", self.contents)
 
+    def test_superpowers_optional_integration_reference_is_explicit(self):
+        reference = SKILL_DIR / "references" / "superpowers-integration.md"
+        self.assertTrue(reference.is_file())
+        self.assertIn("superpowers-integration.md", self.contents)
+        normalized = re.sub(r"\s+", " ", reference.read_text(encoding="utf-8")).casefold()
+        for phrase in (
+            "loaded and active",
+            "optional recommendation when not loaded",
+            "does not start a second workflow",
+            "explicit invocation",
+            "installation, loading, and activation",
+        ):
+            self.assertIn(phrase, normalized)
+        self.assertNotIn("required dependency", normalized)
+        self.assertNotIn("automatically install superpowers", normalized)
+
+    def test_superpowers_reference_maps_lifecycle_skills(self):
+        reference = (SKILL_DIR / "references" / "superpowers-integration.md").read_text(
+            encoding="utf-8"
+        )
+        normalized = re.sub(r"\s+", " ", reference).casefold()
+        for phrase in (
+            "superpowers:brainstorming",
+            "superpowers:systematic-debugging",
+            "superpowers:test-driven-development",
+            "superpowers:verification-before-completion",
+            "dispatching-parallel-agents",
+            "skill is a host-loaded instruction",
+        ):
+            self.assertIn(phrase, normalized)
+
+    def test_internal_routing_and_completion_contract_is_user_silent(self):
+        for phrase in (
+            "internal routing",
+            "does not need to choose",
+            "changes with substantive scope, permission, external-state, or irreversible impact require a user decision",
+            "what changed",
+            "what was verified",
+            "remaining risk",
+            "next user step",
+        ):
+            self.assertIn(phrase, self.normalized)
+
+    def test_recovery_risk_and_preferences_are_documented(self):
+        for name, phrases in {
+            "runtime-state.md": (
+                "goal",
+                "scope_and_non_goals",
+                "acceptance_criteria",
+                "approval_boundary",
+                "do not repeat completed work",
+                "response_detail",
+                "plan_summary",
+            ),
+            "plan-policy.md": (
+                "internal labels",
+                "low-impact",
+                "irreversible",
+                "completion summary",
+            ),
+            "host-adaptation.md": (
+                "new chat or cli session",
+                "does not require fixed plan commands",
+                "host approval",
+            ),
+        }.items():
+            text = re.sub(
+                r"\s+",
+                " ",
+                (SKILL_DIR / "references" / name).read_text(encoding="utf-8"),
+            ).casefold()
+            for phrase in phrases:
+                self.assertIn(phrase, text, f"{name}: {phrase}")
+
     def test_switches_and_references_are_explicit(self):
         for phrase in (
             "ChatGPT web assistance is off by default",

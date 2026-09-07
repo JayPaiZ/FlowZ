@@ -5,6 +5,16 @@ compact, reviewable workflow decisions through a marker in the last assistant
 message; the `Stop hook` reads that marker without saving the surrounding
 message.
 
+## Recovery order
+
+On a new turn or after compaction, the agent first uses the saved context
+package (`goal`, `scope_and_non_goals`, `confirmed_decisions`,
+`acceptance_criteria`, `validation`, and `approval_boundary`). It then checks
+the relevant actual files and tests for fresh evidence and continues the next
+unfinished action. Do not repeat completed work or ask the user to restate a
+field already present. Ask only for a minimal missing field or stale evidence;
+a missing marker never creates an approved boundary.
+
 Append one single-line marker after the user-facing response whenever one of
 these values changes:
 
@@ -20,8 +30,26 @@ these values changes:
 - `reported_conflict_ids`: short stable identifiers for conflicts already
   reported in this task, derived as `<source-locator>:<rule-slug>` according to
   `conflict-policy.md`;
-- `onboarding_status`: `checked` or `degraded`, plus short
-  `onboarding_diagnostics` when relevant.
+- `recommended_optional_workflows`: newly recommended, stable
+  IDs from the integration reference (for example
+  `superpowers:brainstorming` or `superpowers:systematic-debugging`). The Hook
+  rejects unknown slugs, appends valid IDs, ignores an empty list, restores
+  them after compaction, and clears them for the next real task;
+- `onboarding_status`: `pending`, `prompted`, `deferred`, `requested`, `checked`,
+  or `degraded`; state moves forward from `pending`/`prompted` to a requested or completed
+  result; a stale marker cannot downgrade `checked` or `degraded` to a prompt;
+- `onboarding_prompted` and `onboarding_activation_requested`: Hook-controlled
+  flags for the one-time offer and explicit activation; markers cannot set them
+  directly;
+- `available_dependencies`: at most the four catalog dependencies, with a
+  canonical name, checked/degraded status, compatible-alias result, and an
+  optional bounded diagnostic;
+- `response_detail`: optional `concise`, `normal`, or `detailed` session
+  preference;
+- `plan_summary`: optional `hidden` or `brief` session preference. These
+  preferences are ignorable and cannot change permissions, model settings,
+  validation ownership, or project rules;
+- `onboarding_diagnostics`: short saved diagnostics when relevant.
 
 Use valid JSON and include only fields that changed. For example:
 
@@ -42,9 +70,9 @@ changed fields into this one marker.
 Each `context_package` value must be a short string or a small list/map that
 can be flattened into a reviewable string. Use `{}` to clear the whole context
 package and an empty value to remove one stale field. Append only newly
-reported conflict IDs; omit `reported_conflict_ids` when there are none. The
-Hook preserves conflict history for the current task and clears it only when
-the next real task starts. Put the single-line marker block unindented at the
+reported conflict or optional-workflow IDs; omit either field when there are
+none. The Hook preserves both histories for the current task and clears them
+only when the next real task starts. Put the single-line marker block unindented at the
 absolute end of the answer, outside Markdown fences, with no text after it.
 Text that merely quotes or demonstrates a marker is not runtime state.
 

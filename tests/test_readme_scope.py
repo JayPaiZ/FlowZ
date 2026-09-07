@@ -49,6 +49,10 @@ class ReadmeScopeTests(unittest.TestCase):
             installation,
             r"查看安装诊断[\s\S]*?不会重试",
         )
+        self.assertIn("可直接开始任务", installation)
+        self.assertIn("激活 FlowZ 插件", installation)
+        self.assertIn("不强制新会话", installation)
+        self.assertNotIn("第一次处理实际任务时，FlowZ 会检查", installation)
 
     def assert_plan_contract(self, content: str) -> None:
         self.assertRegex(
@@ -99,13 +103,36 @@ class ReadmeScopeTests(unittest.TestCase):
         self.assertIn("非关键", controls)
         self.assertIn("环境相关", controls)
         self.assertIn("浏览器", controls)
+        self.assertIn("使用简洁回答", controls)
+        self.assertIn("使用详细回答", controls)
+        self.assertIn("隐藏计划摘要", controls)
+        self.assertIn("显示简短计划摘要", controls)
+
+    def assert_superpowers_contract(self, content: str) -> None:
+        collaboration = self.section("## 与已有工作流协作", content)
+        self.assertIn("可选", collaboration)
+        self.assertIn("不自动安装", collaboration)
+        self.assertIn("不改变 Quick 语义", collaboration)
+        self.assertIn("未加载", collaboration)
+        self.assertIn("已加载", collaboration)
+        self.assertIn("安装不等于加载", collaboration)
+        self.assertIn("生效", collaboration)
+
+    def assert_ux_contract(self, content: str) -> None:
+        routing = self.section("## FlowZ 如何选择工作深度", content)
+        for phrase in ("自动选择", "不要求用户学习", "自动验证"):
+            self.assertIn(phrase, routing)
 
     def assert_privacy_and_metadata_contract(self, content: str) -> None:
-        metadata = self.section("## 图标、作者与本地开发状态", content)
+        metadata = self.section("## 作者与本地开发状态", content)
+        self.assertNotIn("## 图标、作者与本地开发状态", content)
         self.assertIn("JayPaiZ", metadata)
         self.assertIn("MIT", metadata)
-        self.assertIn("logo.png", metadata)
-        self.assertIn("icon.png", metadata)
+        self.assertIn("github.com/JayPaiZ/FlowZ", metadata)
+        self.assertIn("主页与仓库", metadata)
+        self.assertIn("本地 marketplace 开发版", metadata)
+        self.assertNotIn("logo.png", metadata)
+        self.assertNotIn("icon.png", metadata)
         privacy = self.section("## 隐私与项目边界", content)
         self.assertIn("不会把规则或隐藏状态写入你的项目", privacy)
         self.assertIn("不会修改项目 `AGENTS.md`", privacy)
@@ -128,6 +155,8 @@ class ReadmeScopeTests(unittest.TestCase):
     def test_readme_preserves_conflict_controls_and_default_off_switches(self):
         """Fails if conflict handling or independent session controls become unclear."""
         self.assert_control_and_conflict_contract(self.content)
+        self.assert_superpowers_contract(self.content)
+        self.assert_ux_contract(self.content)
 
     def test_readme_preserves_project_write_and_privacy_boundary(self):
         """Fails if FlowZ could appear to modify a project or retain sensitive prompts."""
