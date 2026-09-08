@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "dependencies": {
+    "humanizer-zh": {
+      "id": "humanizer-zh",
+      "aliases": [],
+      "purpose": "中文文本处理",
+      "optional": true,
+      "source": {
+        "repository": "op7418/Humanizer-zh",
+        "path": "."
+      }
+    },
+    "humanizer": {
+      "id": "humanizer",
+      "aliases": [
+        "humanizer-en"
+      ],
+      "purpose": "英文文本处理",
+      "optional": true,
+      "source": {
+        "repository": "blader/humanizer",
+        "path": "."
+      }
+    },
+    "grilling": {
+      "id": "grilling",
+      "aliases": [],
+      "purpose": "方案质询",
+      "optional": true,
+      "source": {
+        "repository": "mattpocock/skills",
+        "path": "skills/productivity/grilling"
+      }
+    },
+    "gstack-openclaw-office-hours": {
+      "id": "gstack-openclaw-office-hours",
+      "aliases": [
+        "office-hours"
+      ],
+      "purpose": "产品构思",
+      "optional": true,
+      "source": {
+        "repository": "garrytan/gstack",
+        "path": "openclaw/skills/gstack-openclaw-office-hours"
+      }
+    }
+  }
+}

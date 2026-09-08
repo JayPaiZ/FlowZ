@@ -2,6 +2,10 @@
 
 FlowZ 是一个面向 Codex 的本地插件：它会根据任务的风险、范围和不确定性，主动选择合适的工作深度，并协调宿主已有的 Plan 能力、批准边界和自动验证。它是工作流编排层，不替代 Codex 的 Plan，也不会要求你学习固定的内部命令。
 
+## 分支与平台边界
+
+`main` 是 Codex 与 Cline 共通工作流语义的维护基线；`FlowZ-Codex` 和 `FlowZ-Cline` 分别承载宿主专属实现。新功能先判断是否属于共通契约，再由各平台分支完成自己的接入。详细规则见 [`docs/common-boundary.md`](docs/common-boundary.md)。
+
 ## 安装与首次启用
 
 本仓库提供的是本地 marketplace，不是公共插件目录。Codex 将**仓库根目录**作为 marketplace source，并从其中的 [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json) 发现 manifest。在终端中，将 `<REPOSITORY_ROOT>` 替换为当前 FlowZ 检出的根目录后运行：

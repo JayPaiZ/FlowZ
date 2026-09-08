@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "tiers": [
+    "Quick",
+    "Standard",
+    "Full"
+  ],
+  "approvalCases": [
+    {
+      "name": "low_impact_local",
+      "requiresApproval": false
+    },
+    {
+      "name": "material_boundary",
+      "requiresApproval": true
+    }
+  ],
+  "completionSummaryFields": [
+    "changed",
+    "verified",
+    "remainingRisksOrUnfinished",
+    "nextUserStep"
+  ]
+}
