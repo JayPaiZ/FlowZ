@@ -61,6 +61,10 @@ class EndToEndContractTests(unittest.TestCase):
         catalog = load_json(
             PLUGIN / "skills/flowz-onboarding/references/third-party-skills.json"
         )
+        common_path = ROOT / catalog["commonCatalog"]
+        self.assertTrue(common_path.is_file())
+        common = load_json(common_path)
+        self.assertEqual(common["schemaVersion"], 1)
         expected = {
             "humanizer-zh",
             "humanizer",
@@ -68,6 +72,7 @@ class EndToEndContractTests(unittest.TestCase):
             "gstack-openclaw-office-hours",
         }
         self.assertEqual(set(catalog["dependencies"]), expected)
+        self.assertEqual(set(common["dependencies"]), expected)
         for name, dependency in catalog["dependencies"].items():
             self.assertEqual(dependency["canonical"], name)
             self.assertTrue(dependency["optional"])

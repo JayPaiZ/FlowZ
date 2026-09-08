@@ -18,9 +18,11 @@ recommended stable loading boundary, not a prerequisite for onboarding.
 
 Read
 [`references/third-party-skills.json`](references/third-party-skills.json)
-relative to this Skill. Check the canonical name before its compatible aliases.
-Any matching installation satisfies the dependency; never overwrite an
-installed version.
+relative to this Skill. Its `commonCatalog` field points to the normative,
+host-neutral catalog on the `main` branch; the adjacent file is the Codex
+installer projection and may add only Codex-specific installation fields.
+Check the canonical name before its compatible aliases. Any matching
+installation satisfies the dependency; never overwrite an installed version.
 
 For a missing dependency, use the native Codex Skill Installer first. Pass the
 catalog's `installPath`, which is always a Skill directory, and use

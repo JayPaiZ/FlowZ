@@ -1,5 +1,6 @@
 {
   "schemaVersion": 2,
+  "commonCatalog": "core/flowz/dependency-catalog.json",
   "dependencies": {
     "humanizer-zh": {
       "canonical": "humanizer-zh",
