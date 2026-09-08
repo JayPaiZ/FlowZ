@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import re
+import subprocess
 import unittest
 
 
@@ -119,6 +120,21 @@ class EndToEndContractTests(unittest.TestCase):
         ignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
         self.assertIn("/docs/design/", ignore)
         self.assertIn("/AGENTS.md", ignore)
+
+    def test_repository_ignores_future_plans_without_tracking_any_plan_file(self):
+        tracked = subprocess.run(
+            ["git", "ls-files", "docs/superpowers/plans"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.splitlines()
+        self.assertEqual(tracked, [])
+        ignored = subprocess.run(
+            ["git", "check-ignore", "--quiet", "docs/superpowers/plans/future.md"],
+            cwd=ROOT,
+        )
+        self.assertEqual(ignored.returncode, 0)
 
     def test_hook_contract_keeps_task_scoped_recommendations_and_onboarding_separate(self):
         hook = (PLUGIN / "hooks/flowz_hook.py").read_text(encoding="utf-8")

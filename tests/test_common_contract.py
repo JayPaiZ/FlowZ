@@ -103,6 +103,45 @@ class CommonContractTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, serialized)
 
+    def test_common_files_remain_host_neutral(self):
+        for path in sorted(CORE.rglob("*")):
+            if not path.is_file():
+                continue
+            content = path.read_text(encoding="utf-8").casefold()
+            for forbidden in (
+                "codex",
+                "cline",
+                "hook_event_name",
+                "plugin_data",
+                "/deep-planning",
+                ".clinerules",
+                "plugins/flowz",
+            ):
+                self.assertNotIn(forbidden, content, path.name)
+
+    def test_host_specific_marker_mutations_are_rejected(self):
+        forbidden_markers = (
+            "codex",
+            "cline",
+            "hook_event_name",
+            "plugin_data",
+            "/deep-planning",
+            ".clinerules",
+            "plugins/flowz",
+        )
+
+        def assert_host_neutral(serialized):
+            for marker in forbidden_markers:
+                if marker in serialized:
+                    raise AssertionError(f"host marker leaked: {marker}")
+
+        clean = json.dumps(self.contract, ensure_ascii=False).casefold()
+        assert_host_neutral(clean)
+        for forbidden in forbidden_markers:
+            with self.subTest(forbidden=forbidden):
+                with self.assertRaises(AssertionError):
+                    assert_host_neutral(clean + forbidden)
+
 
 if __name__ == "__main__":
     unittest.main()
