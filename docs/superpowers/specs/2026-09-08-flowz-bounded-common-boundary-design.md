@@ -1,6 +1,6 @@
 # FlowZ Bounded Common Boundary Design
 
-**Status:** Approved direction, implementation pending
+**Status:** Implemented on `main` in commits `8c788fc`, `3401080`, `06d916e`, and `b1d30ea`
 
 **Date:** 2026-09-08
 
