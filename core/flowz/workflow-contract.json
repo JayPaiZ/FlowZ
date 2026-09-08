@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "taskTiers": {
+    "Quick": {
+      "planRequired": false,
+      "defaultPersistence": "session",
+      "directVerification": true
+    },
+    "Standard": {
+      "planRequired": "when_materially_uncertain",
+      "defaultPersistence": "task",
+      "directVerification": true
+    },
+    "Full": {
+      "planRequired": true,
+      "defaultPersistence": "task",
+      "directVerification": true
+    }
+  },
+  "lifecycle": {
+    "stages": [
+      "intake",
+      "problem_exploration",
+      "solution_design",
+      "design_challenge",
+      "human_approval",
+      "writing_plan",
+      "implementation",
+      "verification"
+    ],
+    "singleStageLead": true,
+    "enterOnlyWhenExitConditionsAreUnmet": true
+  },
+  "contextPacket": {
+    "requiredFields": [
+      "goal",
+      "scopeAndNonGoals",
+      "constraints",
+      "evidence",
+      "confirmedDecisions",
+      "openQuestions",
+      "acceptanceCriteria",
+      "verification",
+      "nextStep"
+    ],
+    "failureUpdate": "new_evidence_only",
+    "restoreCompletedWork": "do_not_repeat_completed_work"
+  },
+  "riskAndApproval": {
+    "lowImpact": {
+      "continueWithoutApproval": true
+    },
+    "approvalTriggers": [
+      "behavior",
+      "data",
+      "permissions",
+      "architecture",
+      "externalState",
+      "irreversible"
+    ],
+    "hostApprovalRemainsAuthoritative": true
+  },
+  "conflictPolicy": {
+    "precedence": [
+      "system",
+      "project",
+      "host",
+      "enabledCapabilities",
+      "flowz"
+    ],
+    "preserveHigherPriority": true,
+    "modifyConflictingSource": false
+  },
+  "verification": {
+    "evidenceFields": [
+      "check",
+      "result",
+      "scope"
+    ],
+    "requiredBeforeCompletionClaim": true
+  },
+  "completionSummary": {
+    "requiredFields": [
+      "changed",
+      "verified",
+      "remainingRisksOrUnfinished",
+      "nextUserStep"
+    ]
+  },
+  "handoff": {
+    "advisory": true,
+    "automaticSessionCreation": false,
+    "preserveFields": [
+      "goal",
+      "scopeAndNonGoals",
+      "constraints",
+      "confirmedDecisions",
+      "acceptanceCriteria",
+      "verification",
+      "nextStep"
+    ]
+  },
+  "privacy": {
+    "mustNotPersist": [
+      "fullPrompt",
+      "fullResponse",
+      "hiddenReasoning",
+      "credentials",
+      "privateLogs",
+      "unrelatedRuntimeData"
+    ]
+  },
+  "optionalCapabilities": {
+    "userEnabled": true,
+    "automaticInstallation": false,
+    "failureBlocksCore": false
+  }
+}

@@ -5,6 +5,7 @@
 .superpowers/
 tmp/
 /docs/design/
+/docs/superpowers/plans/
 
 # Python test and Hook bytecode caches are local-only.
 __pycache__/
